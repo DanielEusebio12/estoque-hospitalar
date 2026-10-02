@@ -44,10 +44,21 @@ class MovimentacaoEntrada(BaseModel):
         return self
 
 
+# Fórmula única do saldo, reaproveitada em todas as consultas para não divergirem
+SQL_SALDO = (
+    "COALESCE(SUM(CASE WHEN mv.tipo = 'entrada' THEN mv.quantidade ELSE -mv.quantidade END), 0)"
+)
+
+# LEFT JOIN para material sem movimentação aparecer com saldo 0
+SQL_MATERIAIS_COM_SALDO = (
+    f"SELECT m.*, {SQL_SALDO} AS saldo "
+    "FROM materiais m LEFT JOIN movimentacoes mv ON mv.material_id = m.id"
+)
+
+
 def calcular_saldo(conn, material_id: int) -> int:
     linha = conn.execute(
-        "SELECT COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN quantidade ELSE -quantidade END), 0) "
-        "FROM movimentacoes WHERE material_id = ?",
+        f"SELECT {SQL_SALDO} FROM movimentacoes mv WHERE mv.material_id = ?",
         (material_id,),
     ).fetchone()
     return linha[0]
@@ -75,12 +86,12 @@ def criar_material(material: MaterialEntrada):
 
 @app.get("/materiais")
 def listar_materiais(busca: str | None = None):
-    sql = "SELECT * FROM materiais"
+    sql = SQL_MATERIAIS_COM_SALDO
     parametros = []
     if busca:
-        sql += " WHERE nome LIKE ?"
+        sql += " WHERE m.nome LIKE ?"
         parametros.append(f"%{busca}%")
-    sql += " ORDER BY nome"
+    sql += " GROUP BY m.id ORDER BY m.nome"
     with conectar() as conn:
         linhas = conn.execute(sql, parametros).fetchall()
     return [dict(linha) for linha in linhas]
@@ -90,11 +101,28 @@ def listar_materiais(busca: str | None = None):
 def buscar_material(material_id: int):
     with conectar() as conn:
         linha = conn.execute(
-            "SELECT * FROM materiais WHERE id = ?", (material_id,)
+            SQL_MATERIAIS_COM_SALDO + " WHERE m.id = ? GROUP BY m.id", (material_id,)
         ).fetchone()
     if linha is None:
         raise HTTPException(status_code=404, detail="Material não encontrado")
     return dict(linha)
+
+
+@app.get("/materiais/{material_id}/saldo")
+def consultar_saldo(material_id: int):
+    with conectar() as conn:
+        material = conn.execute(
+            "SELECT id, nome, unidade FROM materiais WHERE id = ?", (material_id,)
+        ).fetchone()
+        if material is None:
+            raise HTTPException(status_code=404, detail="Material não encontrado")
+        saldo = calcular_saldo(conn, material_id)
+    return {
+        "material_id": material["id"],
+        "nome": material["nome"],
+        "unidade": material["unidade"],
+        "saldo": saldo,
+    }
 
 
 @app.post("/movimentacoes", status_code=201)
