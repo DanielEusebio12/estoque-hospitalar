@@ -59,6 +59,15 @@
                     <strong id="total-zerados" class="valor-perigo">–</strong>
                 </div>
             </div>
+            <div class="cartao indicador perigo">
+                <div class="indicador-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v3"/></svg>
+                </div>
+                <div>
+                    <span class="indicador-rotulo">Vencidos ou a vencer</span>
+                    <strong id="total-vencimento" class="valor-perigo">–</strong>
+                </div>
+            </div>
         </section>
 
         <div class="grade">
@@ -107,6 +116,8 @@
                                         <option>Pediatria</option>
                                         <option>Maternidade</option>
                                         <option>Ambulatório</option>
+                                        <!-- Precisa ser igual a SETOR_DESCARTE no main.py -->
+                                        <option value="Descarte">Descarte (vencido ou avariado)</option>
                                     </select>
                                 </label>
                             </div>
@@ -143,6 +154,9 @@
                                 <div id="painel-barra" class="barra-preenchida"></div>
                                 <div class="marca-minimo" title="Estoque mínimo"></div>
                             </div>
+
+                            <span class="painel-rotulo">Validades em estoque · retirar nesta ordem</span>
+                            <ul id="painel-validades" class="painel-validades"></ul>
 
                             <span class="painel-rotulo">Últimas movimentações</span>
                             <ul id="painel-ultimas" class="painel-ultimas"></ul>
@@ -297,6 +311,12 @@
             <section class="cartao alertas">
                 <h2>Alertas de estoque baixo <span id="contador-alertas" class="contador" hidden></span></h2>
                 <ul id="lista-alertas"></ul>
+            </section>
+
+            <section class="cartao alertas">
+                <h2>Vencimentos <span class="subtitulo">vencidos ou nos próximos 30 dias</span>
+                    <span id="contador-vencimentos" class="contador" hidden></span></h2>
+                <ul id="lista-vencimentos"></ul>
             </section>
         </div>
 

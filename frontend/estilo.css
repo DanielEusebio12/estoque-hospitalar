@@ -530,6 +530,43 @@ select:focus {
     grid-column: 1 / -1;
 }
 
+.alertas li.vencido {
+    border-left-color: var(--perigo);
+}
+
+h2 .subtitulo {
+    margin-left: 4px;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--texto-suave);
+}
+
+.painel-validades {
+    list-style: none;
+    margin: 8px 0 20px;
+    padding: 0;
+}
+
+.painel-validades li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--raio-pequeno);
+    font-size: 0.85rem;
+}
+
+/* Destaca a validade que deve sair primeiro (FEFO) */
+.painel-validades li.proxima {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+}
+
+.painel-validades li.vazio {
+    color: var(--texto-suave);
+    padding-left: 0;
+}
+
 .alertas li {
     display: flex;
     justify-content: space-between;

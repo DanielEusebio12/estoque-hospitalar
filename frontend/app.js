@@ -349,12 +349,65 @@ async function carregarHistorico() {
         linha.appendChild(criarElemento("td", mov.material));
         linha.appendChild(criarElemento("td", `${mov.tipo === "entrada" ? "+" : "−"}${mov.quantidade} ${mov.unidade}`, "numero"));
         const destino = mov.tipo === "entrada"
-            ? (mov.validade ? "Validade " + mov.validade.split("-").reverse().join("/") : "—")
+            ? (mov.validade ? "Validade " + formatarValidade(mov.validade) : "—")
             : (mov.setor ?? "—");
         linha.appendChild(criarElemento("td", destino));
         // Movimentações de antes do login não têm responsável registrado
         linha.appendChild(criarElemento("td", mov.colaborador ?? "Não registrado"));
         tabela.appendChild(linha);
+    }
+}
+
+// "2027-05-01" vira "01/05/2027"
+function formatarValidade(iso) {
+    return iso.split("-").reverse().join("/");
+}
+
+// Mesmo prazo do alerta na API (DIAS_ALERTA_VENCIMENTO)
+const DIAS_ALERTA_VENCIMENTO = 30;
+
+function criarEtiquetaPrazo(item) {
+    const dias = item.dias_restantes;
+    if (dias === null) {
+        return criarElemento("span", "Sem validade", "etiqueta neutra");
+    }
+    if (dias < 0) {
+        return criarElemento("span", `Vencido há ${-dias} dia${dias === -1 ? "" : "s"}`, "etiqueta perigo");
+    }
+    const texto = dias === 0 ? "Vence hoje" : `Vence em ${dias} dia${dias === 1 ? "" : "s"}`;
+    return criarElemento("span", texto, dias <= DIAS_ALERTA_VENCIMENTO ? "etiqueta alerta" : "etiqueta neutra");
+}
+
+async function carregarVencimentos() {
+    const vencimentos = await chamarApi("/alertas/vencimento");
+    mostrarIndicador("total-vencimento", vencimentos.length);
+    const contador = document.getElementById("contador-vencimentos");
+    contador.textContent = vencimentos.length;
+    contador.hidden = vencimentos.length === 0;
+
+    const lista = document.getElementById("lista-vencimentos");
+    lista.replaceChildren();
+    if (vencimentos.length === 0) {
+        lista.appendChild(criarElemento("li", "✓ Nenhum item vencido ou vencendo nos próximos 30 dias", "sem-alerta"));
+        return;
+    }
+    for (const vencimento of vencimentos) {
+        const item = document.createElement("li");
+        if (vencimento.vencido) {
+            item.className = "vencido";
+        }
+        const textos = document.createElement("div");
+        textos.appendChild(criarElemento("span", vencimento.nome, "alerta-nome"));
+        textos.appendChild(
+            criarElemento(
+                "span",
+                `Validade ${formatarValidade(vencimento.validade)} · ${vencimento.quantidade} ${vencimento.unidade}`,
+                "alerta-detalhe",
+            ),
+        );
+        item.appendChild(textos);
+        item.appendChild(criarEtiquetaPrazo(vencimento));
+        lista.appendChild(item);
     }
 }
 
@@ -390,7 +443,33 @@ async function atualizarPainelItem() {
         barra.classList.add("alerta");
     }
 
-    const movimentacoes = await chamarApi(`/movimentacoes?material_id=${material.id}`);
+    const [validades, movimentacoes] = await Promise.all([
+        chamarApi(`/materiais/${material.id}/validades`),
+        chamarApi(`/movimentacoes?material_id=${material.id}`),
+    ]);
+
+    // Já vem na ordem FEFO: a primeira é a que deve sair primeiro
+    const listaValidades = document.getElementById("painel-validades");
+    listaValidades.replaceChildren();
+    if (validades.length === 0) {
+        listaValidades.appendChild(criarElemento("li", "Nada em estoque.", "vazio"));
+    }
+    validades.forEach((validade, indice) => {
+        const item = document.createElement("li");
+        if (indice === 0) {
+            item.className = "proxima";
+        }
+        const texto = document.createElement("div");
+        texto.className = "movimento-texto";
+        texto.appendChild(
+            criarElemento("span", validade.validade ? formatarValidade(validade.validade) : "Sem validade"),
+        );
+        texto.appendChild(criarElemento("small", `${validade.quantidade} ${material.unidade}`));
+        item.appendChild(texto);
+        item.appendChild(criarEtiquetaPrazo(validade));
+        listaValidades.appendChild(item);
+    });
+
     const lista = document.getElementById("painel-ultimas");
     lista.replaceChildren();
     if (movimentacoes.length === 0) {
@@ -416,7 +495,13 @@ async function atualizarPainelItem() {
 }
 
 async function atualizarTela() {
-    const carregamentos = [carregarMateriais(), carregarListaCompleta(), carregarAlertas(), carregarHistorico()];
+    const carregamentos = [
+        carregarMateriais(),
+        carregarListaCompleta(),
+        carregarAlertas(),
+        carregarVencimentos(),
+        carregarHistorico(),
+    ];
     if (ehAdmin()) {
         carregamentos.push(carregarColaboradores());
     }
@@ -559,7 +644,9 @@ function abrirAba(botao) {
         document.getElementById(outro.dataset.aba).hidden = !ativo;
     });
     // Nas abas de consulta e gestão os alertas só ocupariam espaço
-    document.querySelector(".alertas").hidden = botao.hasAttribute("data-sem-alertas");
+    document.querySelectorAll(".alertas").forEach((cartao) => {
+        cartao.hidden = botao.hasAttribute("data-sem-alertas");
+    });
 }
 
 document.querySelectorAll(".aba").forEach((botao) => {

@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -91,6 +91,8 @@ class MovimentacaoEntrada(BaseModel):
         # Entrada precisa da validade para controle de vencimento; saída precisa do setor de destino
         if self.tipo == "entrada" and not self.validade:
             raise ValueError("Entrada exige a validade")
+        if self.tipo == "entrada" and self.validade < date.today():
+            raise ValueError("Não é possível dar entrada em item já vencido")
         if self.tipo == "saida" and not self.setor:
             raise ValueError("Saída exige o setor de destino")
         return self
@@ -121,6 +123,56 @@ def calcular_saldo(conn, material_id: int) -> int:
         (material_id,),
     ).fetchone()
     return linha[0]
+
+
+# ---------- Validades (FEFO) ----------
+
+# Itens vencidos ou que vencem nesse prazo entram no alerta
+DIAS_ALERTA_VENCIMENTO = 30
+# Saída para esse setor é o descarte de vencidos; é a única liberada quando há unidades vencidas
+SETOR_DESCARTE = "Descarte"
+
+
+def distribuir_fefo(entradas: list, total_saidas: int) -> list[dict]:
+    """Quanto sobra de cada validade, supondo que as saídas consumiram primeiro o que vence primeiro.
+
+    `entradas` precisa vir ordenada da validade mais próxima para a mais distante.
+    """
+    a_descontar = total_saidas
+    validades = []
+    for entrada in entradas:
+        consumido = min(entrada["quantidade"], a_descontar)
+        a_descontar -= consumido
+        restante = entrada["quantidade"] - consumido
+        if restante > 0:
+            validades.append({"validade": entrada["validade"], "quantidade": restante})
+    return validades
+
+
+def descrever_validade(item: dict, hoje: date) -> dict:
+    dias = (date.fromisoformat(item["validade"]) - hoje).days if item["validade"] else None
+    return {**item, "dias_restantes": dias, "vencido": dias is not None and dias < 0}
+
+
+# "validade IS NULL" no ORDER BY joga entradas sem validade para o fim, já que não vencem
+SQL_ENTRADAS_POR_VALIDADE = (
+    "SELECT material_id, validade, SUM(quantidade) AS quantidade FROM movimentacoes "
+    "WHERE tipo = 'entrada' {filtro} "
+    "GROUP BY material_id, validade ORDER BY material_id, validade IS NULL, validade"
+)
+
+
+def calcular_validades(conn, material_id: int) -> list[dict]:
+    entradas = conn.execute(
+        SQL_ENTRADAS_POR_VALIDADE.format(filtro="AND material_id = ?"), (material_id,)
+    ).fetchall()
+    total_saidas = conn.execute(
+        "SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes "
+        "WHERE material_id = ? AND tipo = 'saida'",
+        (material_id,),
+    ).fetchone()[0]
+    hoje = date.today()
+    return [descrever_validade(item, hoje) for item in distribuir_fefo(entradas, total_saidas)]
 
 
 def verificar_permissao(usuario: dict, tipo: str, categoria: str):
@@ -308,6 +360,58 @@ def consultar_saldo(material_id: int, usuario: dict = Depends(usuario_logado)):
     }
 
 
+@app.get("/materiais/{material_id}/validades")
+def consultar_validades(material_id: int, usuario: dict = Depends(usuario_logado)):
+    with conectar() as conn:
+        existe = conn.execute("SELECT 1 FROM materiais WHERE id = ?", (material_id,)).fetchone()
+        if existe is None:
+            raise HTTPException(status_code=404, detail="Material não encontrado")
+        return calcular_validades(conn, material_id)
+
+
+@app.get("/alertas/vencimento")
+def alertas_vencimento(
+    dias: int = Query(default=DIAS_ALERTA_VENCIMENTO, ge=0, le=365),
+    usuario: dict = Depends(usuario_logado),
+):
+    with conectar() as conn:
+        materiais = {
+            linha["id"]: linha
+            for linha in conn.execute("SELECT id, nome, unidade FROM materiais WHERE ativo = 1")
+        }
+        entradas = conn.execute(SQL_ENTRADAS_POR_VALIDADE.format(filtro="")).fetchall()
+        saidas = dict(
+            conn.execute(
+                "SELECT material_id, SUM(quantidade) FROM movimentacoes "
+                "WHERE tipo = 'saida' GROUP BY material_id"
+            ).fetchall()
+        )
+
+    # Uma consulta para todos os itens em vez de uma por item; o FEFO é feito aqui em Python
+    entradas_por_material = {}
+    for entrada in entradas:
+        entradas_por_material.setdefault(entrada["material_id"], []).append(entrada)
+
+    hoje = date.today()
+    alertas = []
+    for material_id, lista in entradas_por_material.items():
+        material = materiais.get(material_id)
+        if material is None:  # item desativado
+            continue
+        for item in distribuir_fefo(lista, saidas.get(material_id, 0)):
+            validade = descrever_validade(item, hoje)
+            if validade["dias_restantes"] is not None and validade["dias_restantes"] <= dias:
+                alertas.append(
+                    {
+                        "material_id": material_id,
+                        "nome": material["nome"],
+                        "unidade": material["unidade"],
+                        **validade,
+                    }
+                )
+    return sorted(alertas, key=lambda alerta: alerta["validade"])
+
+
 @app.get("/alertas/estoque-baixo")
 def alertas_estoque_baixo(usuario: dict = Depends(usuario_logado)):
     # HAVING porque o saldo só existe depois do agrupamento
@@ -476,7 +580,7 @@ def registrar_movimentacao(mov: MovimentacaoEntrada, usuario: dict = Depends(usu
         # Trava a escrita já no início para duas saídas simultâneas não deixarem o saldo negativo
         conn.execute("BEGIN IMMEDIATE")
         material = conn.execute(
-            "SELECT categoria, ativo FROM materiais WHERE id = ?", (mov.material_id,)
+            "SELECT categoria, unidade, ativo FROM materiais WHERE id = ?", (mov.material_id,)
         ).fetchone()
         if material is None:
             raise HTTPException(status_code=404, detail="Material não encontrado")
@@ -485,6 +589,20 @@ def registrar_movimentacao(mov: MovimentacaoEntrada, usuario: dict = Depends(usu
 
         # O responsável vem da sessão, e não do formulário, para ninguém registrar em nome de outro
         verificar_permissao(usuario, mov.tipo, material["categoria"])
+
+        if mov.tipo == "saida" and mov.setor != SETOR_DESCARTE:
+            # Pelo FEFO, a saída consumiria as unidades vencidas como se fossem para um paciente
+            vencidas = sum(
+                item["quantidade"]
+                for item in calcular_validades(conn, mov.material_id)
+                if item["vencido"]
+            )
+            if vencidas > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Há {vencidas} {material['unidade']} vencido(s) deste item. "
+                    f"Registre o descarte (setor {SETOR_DESCARTE}) antes de uma nova saída",
+                )
 
         if mov.tipo == "saida":
             saldo = calcular_saldo(conn, mov.material_id)
