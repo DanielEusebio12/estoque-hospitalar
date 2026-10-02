@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estoque da Farmácia Hospitalar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/static/estilo.css">
+</head>
+<body>
+    <header class="topo">
+        <div class="marca">
+            <div class="logo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg>
+            </div>
+            <div>
+                <h1>Farmácia Hospitalar</h1>
+                <p>Controle de estoque</p>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="resumo">
+            <div class="cartao indicador">
+                <span class="indicador-rotulo">Itens cadastrados</span>
+                <strong id="total-materiais">–</strong>
+            </div>
+            <div class="cartao indicador">
+                <span class="indicador-rotulo">Abaixo do mínimo</span>
+                <strong id="total-alertas" class="valor-alerta">–</strong>
+            </div>
+            <div class="cartao indicador">
+                <span class="indicador-rotulo">Sem estoque</span>
+                <strong id="total-zerados" class="valor-perigo">–</strong>
+            </div>
+        </section>
+
+        <div class="grade">
+            <section class="cartao">
+                <nav class="abas">
+                    <button type="button" class="aba ativa" data-aba="aba-movimentacao">Entrada e saída</button>
+                    <button type="button" class="aba" data-aba="aba-cadastro">Cadastrar item</button>
+                </nav>
+
+                <div id="aba-movimentacao">
+                    <form id="form-movimentacao">
+                        <div class="seletor-tipo">
+                            <label class="opcao-tipo entrada">
+                                <input type="radio" name="tipo" value="entrada" checked>
+                                <span>↓ Entrada</span>
+                            </label>
+                            <label class="opcao-tipo saida">
+                                <input type="radio" name="tipo" value="saida">
+                                <span>↑ Saída</span>
+                            </label>
+                        </div>
+
+                        <label>Medicamento ou material
+                            <select name="material_id" id="select-material" required></select>
+                        </label>
+
+                        <div class="linha-campos">
+                            <label>Quantidade <input name="quantidade" type="number" min="1" required placeholder="0"></label>
+                            <div id="campos-entrada">
+                                <label>Validade <input name="validade" type="date"></label>
+                            </div>
+                            <div id="campos-saida" hidden>
+                                <label>Setor
+                                    <select name="setor">
+                                        <option value="">Selecione...</option>
+                                        <option>Pronto-socorro</option>
+                                        <option>UTI Adulto</option>
+                                        <option>UTI Neonatal</option>
+                                        <option>Centro cirúrgico</option>
+                                        <option>Clínica médica</option>
+                                        <option>Pediatria</option>
+                                        <option>Maternidade</option>
+                                        <option>Ambulatório</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="botao-principal">Registrar</button>
+                    </form>
+                </div>
+
+                <div id="aba-cadastro" hidden>
+                    <form id="form-material">
+                        <label>Nome <input name="nome" required minlength="2" placeholder="Ex.: Dipirona 500mg"></label>
+
+                        <div class="linha-campos">
+                            <label>Categoria
+                                <select name="categoria" required>
+                                    <option value="">Selecione...</option>
+                                    <option>Medicamento</option>
+                                    <option>Material hospitalar</option>
+                                    <option>Soro e solução</option>
+                                    <option>Antisséptico</option>
+                                    <option>Material de limpeza</option>
+                                </select>
+                            </label>
+                            <!-- Valores em minúsculo porque aparecem no meio de frases, ex.: "saldo: 10 ampola" -->
+                            <label>Unidade
+                                <select name="unidade" required>
+                                    <option value="">Selecione...</option>
+                                    <option>comprimido</option>
+                                    <option>cápsula</option>
+                                    <option>ampola</option>
+                                    <option>frasco</option>
+                                    <option>frasco-ampola</option>
+                                    <option>bolsa</option>
+                                    <option>caixa</option>
+                                    <option>pacote</option>
+                                    <option>par</option>
+                                    <option>rolo</option>
+                                    <option>unidade</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <label>Estoque mínimo <input name="estoque_minimo" type="number" min="0" value="0"></label>
+
+                        <button type="submit" class="botao-principal">Cadastrar</button>
+                    </form>
+                </div>
+            </section>
+
+            <section class="cartao alertas">
+                <h2>Alertas de estoque baixo</h2>
+                <ul id="lista-alertas"></ul>
+            </section>
+        </div>
+
+        <section class="cartao cartao-tabela">
+            <div class="titulo-com-busca">
+                <h2>Estoque</h2>
+                <input id="busca" type="search" placeholder="Buscar por nome...">
+            </div>
+            <div class="tabela-rolagem">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th>Unidade</th>
+                            <th class="numero">Mínimo</th>
+                            <th class="numero">Saldo</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-materiais"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="mensagem" class="mensagem" role="status" aria-live="polite" hidden></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

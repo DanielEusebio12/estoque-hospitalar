@@ -7,14 +7,21 @@
 #     return {"mensagem": "Estoque funcionando"}
 import sqlite3
 from datetime import date
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from database import conectar, criar_tabelas
 
+# Caminho a partir deste arquivo, para funcionar de qualquer pasta onde o servidor for iniciado
+PASTA_FRONTEND = Path(__file__).parent / "frontend"
+
 app = FastAPI(title="Controle de estoque hospitalar")
+app.mount("/static", StaticFiles(directory=PASTA_FRONTEND), name="static")
 
 criar_tabelas()
 
@@ -66,7 +73,7 @@ def calcular_saldo(conn, material_id: int) -> int:
 
 @app.get("/")
 def raiz():
-    return {"mensagem": "Estoque funcionando"}
+    return FileResponse(PASTA_FRONTEND / "index.html")
 
 
 @app.post("/materiais", status_code=201)
