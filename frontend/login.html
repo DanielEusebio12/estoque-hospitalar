@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar · Farmácia Hospitalar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/static/estilo.css">
+</head>
+<body class="pagina-acesso">
+    <main class="cartao cartao-acesso">
+        <div class="marca marca-acesso">
+            <div class="logo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg>
+            </div>
+            <div>
+                <h1>Farmácia Hospitalar</h1>
+                <p>Controle de estoque</p>
+            </div>
+        </div>
+
+        <h2>Entrar</h2>
+        <form id="form-login">
+            <label>Usuário
+                <input name="usuario" required autocomplete="username" autocapitalize="none" placeholder="nome.sobrenome" autofocus>
+            </label>
+            <label>Senha
+                <input name="senha" type="password" required autocomplete="current-password">
+            </label>
+            <p id="erro" class="erro-formulario" role="alert" hidden></p>
+            <button type="submit" class="botao-principal">Entrar</button>
+        </form>
+    </main>
+
+    <script src="/static/login.js"></script>
+</body>
+</html>

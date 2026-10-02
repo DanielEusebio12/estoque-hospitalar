@@ -19,6 +19,13 @@
                 <h1>Farmácia Hospitalar</h1>
                 <p>Controle de estoque</p>
             </div>
+            <div class="usuario-topo">
+                <div class="usuario-dados">
+                    <strong id="usuario-nome"></strong>
+                    <span id="usuario-perfil"></span>
+                </div>
+                <button type="button" id="botao-sair" class="botao-secundario">Sair</button>
+            </div>
         </div>
     </header>
 
@@ -42,7 +49,11 @@
             <section class="cartao">
                 <nav class="abas">
                     <button type="button" class="aba ativa" data-aba="aba-movimentacao">Entrada e saída</button>
-                    <button type="button" class="aba" data-aba="aba-cadastro">Cadastrar item</button>
+                    <!-- data-tela-cheia: a aba ocupa a largura toda e esconde os alertas -->
+                    <button type="button" class="aba" data-aba="aba-historico" data-tela-cheia>Histórico</button>
+                    <!-- A API é quem bloqueia de verdade; esconder as abas é só para não mostrar o que a pessoa não pode usar -->
+                    <button type="button" class="aba so-admin" data-aba="aba-cadastro" hidden>Cadastrar item</button>
+                    <button type="button" class="aba so-admin" data-aba="aba-colaboradores" data-tela-cheia hidden>Colaboradores</button>
                 </nav>
 
                 <div id="aba-movimentacao">
@@ -126,6 +137,81 @@
 
                         <button type="submit" class="botao-principal">Cadastrar</button>
                     </form>
+                </div>
+
+                <div id="aba-colaboradores" hidden>
+                    <div id="aviso-edicao" class="aviso-edicao" hidden>
+                        <span>Editando <strong id="nome-em-edicao"></strong></span>
+                        <button type="button" id="cancelar-edicao" class="botao-secundario">Cancelar</button>
+                    </div>
+                    <form id="form-colaborador">
+                        <label>Nome <input name="nome" required minlength="2" placeholder="Ex.: Maria Souza"></label>
+
+                        <div class="linha-campos">
+                            <label>Matrícula <input name="matricula" required placeholder="Ex.: 10234"></label>
+                            <label>Usuário
+                                <input name="usuario" required autocapitalize="none" placeholder="nome.sobrenome">
+                            </label>
+                        </div>
+
+                        <div class="linha-campos">
+                            <!-- Precisa ser igual aos cargos aceitos pela API (Cargo no main.py) -->
+                            <label>Cargo
+                                <select name="cargo" required>
+                                    <option value="">Selecione...</option>
+                                    <option>Farmacêutico</option>
+                                    <option>Enfermeiro</option>
+                                    <option>Técnico de enfermagem</option>
+                                    <option>Auxiliar de limpeza</option>
+                                    <option>Administrador</option>
+                                </select>
+                            </label>
+                            <label>Perfil de acesso
+                                <!-- A opção "Administrador" é adicionada pelo app.js só para o super admin -->
+                                <select name="perfil" id="select-perfil">
+                                    <option value="comum">Comum</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <p id="dica-senha-padrao" class="dica">A pessoa entra com a senha padrão e é obrigada a trocá-la no primeiro acesso.</p>
+                        <button type="submit" id="botao-salvar-colaborador" class="botao-principal">Cadastrar colaborador</button>
+                    </form>
+
+                    <ul id="lista-colaboradores" class="lista-colaboradores"></ul>
+                </div>
+
+                <div id="aba-historico" hidden>
+                    <p id="aviso-historico" class="texto-suave"></p>
+                    <div class="filtros">
+                        <label>Item
+                            <select id="filtro-material">
+                                <option value="">Todos os itens</option>
+                            </select>
+                        </label>
+                        <label>Tipo
+                            <select id="filtro-tipo">
+                                <option value="">Entradas e saídas</option>
+                                <option value="entrada">Só entradas</option>
+                                <option value="saida">Só saídas</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="tabela-rolagem">
+                        <table class="tabela-historico">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Item</th>
+                                    <th class="numero">Quantidade</th>
+                                    <th>Destino / validade</th>
+                                    <th>Responsável</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-historico"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 

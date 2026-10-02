@@ -4,11 +4,23 @@ async function chamarApi(caminho, opcoes = {}) {
         headers: { "Content-Type": "application/json" },
         ...opcoes,
     });
+    // Sessão expirou ou o acesso foi bloqueado: volta para o login
+    if (resposta.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Sessão encerrada");
+    }
     const dados = await resposta.json();
     if (!resposta.ok) {
         throw new Error(traduzirErro(dados.detail));
     }
     return dados;
+}
+
+const NOMES_PERFIL = { super_admin: "Super admin", admin: "Administrador", comum: "Comum" };
+let usuarioAtual = null;
+
+function ehAdmin() {
+    return usuarioAtual.perfil === "admin" || usuarioAtual.perfil === "super_admin";
 }
 
 // 409/404 vêm como texto; 422 (Pydantic) vem como lista de erros
@@ -102,6 +114,17 @@ async function carregarListaCompleta() {
     }
     select.value = selecionado || select.value;
 
+    const filtro = document.getElementById("filtro-material");
+    const filtroSelecionado = filtro.value;
+    filtro.replaceChildren(criarElemento("option", "Todos os itens"));
+    filtro.firstChild.value = "";
+    for (const material of materiais) {
+        const opcao = criarElemento("option", material.nome);
+        opcao.value = material.id;
+        filtro.appendChild(opcao);
+    }
+    filtro.value = filtroSelecionado;
+
     mostrarIndicador("total-materiais", materiais.length);
     mostrarIndicador("total-zerados", materiais.filter((material) => material.saldo === 0).length);
 }
@@ -132,9 +155,146 @@ async function carregarAlertas() {
     }
 }
 
-async function atualizarTela() {
+// Espelha a regra da API (verificar_pode_gerenciar) só para não mostrar botões que dariam erro
+function podeGerenciar(colaborador) {
+    if (colaborador.id === usuarioAtual.id || colaborador.perfil === "super_admin") {
+        return false;
+    }
+    return colaborador.perfil === "comum" || usuarioAtual.perfil === "super_admin";
+}
+
+function criarBotao(texto, classe, aoClicar) {
+    const botao = criarElemento("button", texto, classe);
+    botao.type = "button";
+    botao.addEventListener("click", aoClicar);
+    return botao;
+}
+
+async function alterarAcesso(colaborador) {
+    const liberar = !colaborador.ativo;
     try {
-        await Promise.all([carregarMateriais(), carregarListaCompleta(), carregarAlertas()]);
+        await chamarApi(`/colaboradores/${colaborador.id}/acesso`, {
+            method: "PATCH",
+            body: JSON.stringify({ ativo: liberar }),
+        });
+        mostrarMensagem(`Acesso de ${colaborador.nome} ${liberar ? "liberado" : "bloqueado"}.`, "sucesso");
+        await carregarColaboradores();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+    }
+}
+
+async function resetarSenha(colaborador) {
+    try {
+        await chamarApi(`/colaboradores/${colaborador.id}/resetar-senha`, { method: "POST" });
+        mostrarMensagem(`Senha de ${colaborador.nome} voltou para a padrão.`, "sucesso");
+        await carregarColaboradores();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+    }
+}
+
+async function carregarColaboradores() {
+    const colaboradores = await chamarApi("/colaboradores");
+    const lista = document.getElementById("lista-colaboradores");
+    lista.replaceChildren();
+    for (const colaborador of colaboradores) {
+        const item = document.createElement("li");
+        const textos = document.createElement("div");
+        textos.appendChild(criarElemento("span", colaborador.nome, "alerta-nome"));
+        const login = colaborador.usuario ? colaborador.usuario : "sem login";
+        textos.appendChild(
+            criarElemento("span", `${login} · ${colaborador.cargo} · Matrícula ${colaborador.matricula}`, "alerta-detalhe"),
+        );
+        item.appendChild(textos);
+
+        const acoes = document.createElement("div");
+        acoes.className = "acoes";
+        acoes.appendChild(criarElemento("span", NOMES_PERFIL[colaborador.perfil], "etiqueta neutra"));
+        if (!colaborador.ativo) {
+            acoes.appendChild(criarElemento("span", "Bloqueado", "etiqueta perigo"));
+        } else if (colaborador.trocar_senha) {
+            acoes.appendChild(criarElemento("span", "Senha padrão", "etiqueta alerta"));
+        }
+        if (podeGerenciar(colaborador)) {
+            acoes.appendChild(criarBotao("Editar", "botao-secundario", () => iniciarEdicao(colaborador)));
+        }
+        // Bloquear e resetar só fazem sentido para quem já tem login
+        if (podeGerenciar(colaborador) && colaborador.usuario) {
+            acoes.appendChild(
+                criarBotao(
+                    colaborador.ativo ? "Bloquear" : "Liberar",
+                    colaborador.ativo ? "botao-secundario perigo" : "botao-secundario",
+                    () => alterarAcesso(colaborador),
+                ),
+            );
+            acoes.appendChild(criarBotao("Resetar senha", "botao-secundario", () => resetarSenha(colaborador)));
+        }
+        item.appendChild(acoes);
+        lista.appendChild(item);
+    }
+}
+
+// O banco guarda "2026-10-02 18:30:12"; corta o texto em vez de usar Date para não mexer no fuso
+function formatarData(texto) {
+    const [data, hora] = texto.split(" ");
+    const [ano, mes, dia] = data.split("-");
+    return `${dia}/${mes}/${ano} ${hora.slice(0, 5)}`;
+}
+
+async function carregarHistorico() {
+    const parametros = new URLSearchParams();
+    const materialId = document.getElementById("filtro-material").value;
+    const tipo = document.getElementById("filtro-tipo").value;
+    if (materialId) {
+        parametros.set("material_id", materialId);
+    }
+    if (tipo) {
+        parametros.set("tipo", tipo);
+    }
+    const movimentacoes = await chamarApi("/movimentacoes?" + parametros);
+
+    const tabela = document.getElementById("tabela-historico");
+    tabela.replaceChildren();
+    if (movimentacoes.length === 0) {
+        const celula = criarElemento("td", "Nenhuma movimentação encontrada.", "vazio");
+        celula.colSpan = 6;
+        const linha = document.createElement("tr");
+        linha.appendChild(celula);
+        tabela.appendChild(linha);
+        return;
+    }
+    for (const mov of movimentacoes) {
+        const linha = document.createElement("tr");
+        linha.appendChild(criarElemento("td", formatarData(mov.data)));
+
+        const celulaTipo = document.createElement("td");
+        celulaTipo.appendChild(
+            mov.tipo === "entrada"
+                ? criarElemento("span", "Entrada", "etiqueta ok")
+                : criarElemento("span", "Saída", "etiqueta alerta"),
+        );
+        linha.appendChild(celulaTipo);
+
+        linha.appendChild(criarElemento("td", mov.material));
+        linha.appendChild(criarElemento("td", `${mov.tipo === "entrada" ? "+" : "−"}${mov.quantidade} ${mov.unidade}`, "numero"));
+        const destino = mov.tipo === "entrada"
+            ? (mov.validade ? "Validade " + mov.validade.split("-").reverse().join("/") : "—")
+            : (mov.setor ?? "—");
+        linha.appendChild(criarElemento("td", destino));
+        // Movimentações de antes do login não têm responsável registrado
+        linha.appendChild(criarElemento("td", mov.colaborador ?? "Não registrado"));
+        tabela.appendChild(linha);
+    }
+}
+
+async function atualizarTela() {
+    const carregamentos = [carregarMateriais(), carregarListaCompleta(), carregarAlertas(), carregarHistorico()];
+    if (ehAdmin()) {
+        carregamentos.push(carregarColaboradores());
+    }
+    try {
+        await Promise.all(carregamentos);
     } catch (erro) {
         mostrarMensagem("Erro ao carregar dados: " + erro.message, "erro");
     }
@@ -150,6 +310,53 @@ document.getElementById("form-material").addEventListener("submit", async (event
         mostrarMensagem(`"${material.nome}" cadastrado com sucesso.`, "sucesso");
         form.reset();
         await atualizarTela();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+    }
+});
+
+// O mesmo formulário serve para cadastrar e editar; null quer dizer "cadastrando"
+let colaboradorEmEdicao = null;
+
+function iniciarEdicao(colaborador) {
+    colaboradorEmEdicao = colaborador;
+    const form = document.getElementById("form-colaborador");
+    for (const campo of ["nome", "matricula", "usuario", "cargo", "perfil"]) {
+        form.elements[campo].value = colaborador[campo] ?? "";
+    }
+    document.getElementById("nome-em-edicao").textContent = colaborador.nome;
+    document.getElementById("aviso-edicao").hidden = false;
+    document.getElementById("botao-salvar-colaborador").textContent = "Salvar alterações";
+    // A dica da senha padrão só vale para quem ainda vai ganhar login
+    document.getElementById("dica-senha-padrao").hidden = Boolean(colaborador.usuario);
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelarEdicao() {
+    colaboradorEmEdicao = null;
+    document.getElementById("form-colaborador").reset();
+    document.getElementById("aviso-edicao").hidden = true;
+    document.getElementById("botao-salvar-colaborador").textContent = "Cadastrar colaborador";
+    document.getElementById("dica-senha-padrao").hidden = false;
+}
+
+document.getElementById("cancelar-edicao").addEventListener("click", cancelarEdicao);
+
+document.getElementById("form-colaborador").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const dados = Object.fromEntries(new FormData(evento.target));
+    const editando = colaboradorEmEdicao !== null;
+    try {
+        const colaborador = await chamarApi(
+            editando ? `/colaboradores/${colaboradorEmEdicao.id}` : "/colaboradores",
+            { method: editando ? "PUT" : "POST", body: JSON.stringify(dados) },
+        );
+        mostrarMensagem(
+            editando ? `Dados de ${colaborador.nome} atualizados.` : `Cadastro de ${colaborador.nome} (${colaborador.cargo}) concluído.`,
+            "sucesso",
+        );
+        cancelarEdicao();
+        await carregarColaboradores();
     } catch (erro) {
         mostrarMensagem(erro.message, "erro");
     }
@@ -190,6 +397,10 @@ document.querySelectorAll(".aba").forEach((botao) => {
             outro.classList.toggle("ativa", ativo);
             document.getElementById(outro.dataset.aba).hidden = !ativo;
         });
+        // Abas de consulta e gestão usam a largura toda; os alertas só ajudam em quem está movimentando
+        const telaCheia = botao.hasAttribute("data-tela-cheia");
+        document.querySelector(".alertas").hidden = telaCheia;
+        document.querySelector(".grade").classList.toggle("uma-coluna", telaCheia);
     });
 });
 
@@ -210,4 +421,40 @@ document.getElementById("busca").addEventListener("input", () => {
     carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
 });
 
-atualizarTela();
+for (const id of ["filtro-material", "filtro-tipo"]) {
+    document.getElementById(id).addEventListener("change", () => {
+        carregarHistorico().catch((erro) => mostrarMensagem(erro.message, "erro"));
+    });
+}
+
+document.getElementById("botao-sair").addEventListener("click", async () => {
+    await fetch("/logout", { method: "POST" });
+    window.location.href = "/login";
+});
+
+// Descobre quem está logado antes de montar a tela, porque o que aparece depende do perfil
+async function iniciar() {
+    usuarioAtual = await chamarApi("/eu");
+    if (usuarioAtual.trocar_senha) {
+        window.location.href = "/trocar-senha";
+        return;
+    }
+    document.getElementById("usuario-nome").textContent = usuarioAtual.nome;
+    document.getElementById("usuario-perfil").textContent =
+        `${NOMES_PERFIL[usuarioAtual.perfil]} · ${usuarioAtual.cargo}`;
+
+    if (ehAdmin()) {
+        document.querySelectorAll(".so-admin").forEach((elemento) => (elemento.hidden = false));
+    }
+    document.getElementById("aviso-historico").textContent = ehAdmin()
+        ? "Todas as movimentações, das mais recentes para as mais antigas."
+        : "Suas movimentações, das mais recentes para as mais antigas.";
+    if (usuarioAtual.perfil === "super_admin") {
+        const opcao = criarElemento("option", "Administrador");
+        opcao.value = "admin";
+        document.getElementById("select-perfil").appendChild(opcao);
+    }
+    await atualizarTela();
+}
+
+iniciar().catch((erro) => mostrarMensagem(erro.message, "erro"));

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trocar senha · Farmácia Hospitalar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/static/estilo.css">
+</head>
+<body class="pagina-acesso">
+    <main class="cartao cartao-acesso">
+        <h2>Crie uma nova senha</h2>
+        <p id="aviso-primeiro-acesso" class="texto-suave" hidden>
+            Este é o seu primeiro acesso (ou sua senha foi redefinida). Por segurança, troque a senha padrão.
+        </p>
+
+        <form id="form-senha">
+            <label>Senha atual
+                <input name="senha_atual" type="password" required autocomplete="current-password">
+            </label>
+            <label>Nova senha
+                <input name="nova_senha" type="password" required minlength="8" autocomplete="new-password">
+                <span class="dica">Mínimo de 8 caracteres.</span>
+            </label>
+            <label>Repita a nova senha
+                <input name="confirmacao" type="password" required minlength="8" autocomplete="new-password">
+            </label>
+            <p id="erro" class="erro-formulario" role="alert" hidden></p>
+            <button type="submit" class="botao-principal">Salvar nova senha</button>
+        </form>
+        <button type="button" id="sair" class="botao-link">Sair</button>
+    </main>
+
+    <script src="/static/trocar-senha.js"></script>
+</body>
+</html>
