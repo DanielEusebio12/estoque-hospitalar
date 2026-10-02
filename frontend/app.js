@@ -9,6 +9,10 @@ async function chamarApi(caminho, opcoes = {}) {
         window.location.href = "/login";
         throw new Error("Sessão encerrada");
     }
+    // 204 (exclusão) responde sem corpo
+    if (resposta.status === 204) {
+        return null;
+    }
     const dados = await resposta.json();
     if (!resposta.ok) {
         throw new Error(traduzirErro(dados.detail));
@@ -56,6 +60,9 @@ function criarElemento(tag, texto, classe) {
 }
 
 function criarEtiqueta(material) {
+    if (!material.ativo) {
+        return criarElemento("span", "Desativado", "etiqueta neutra");
+    }
     if (material.saldo === 0) {
         return criarElemento("span", "Sem estoque", "etiqueta perigo");
     }
@@ -65,16 +72,64 @@ function criarEtiqueta(material) {
     return criarElemento("span", "Normal", "etiqueta ok");
 }
 
+async function alterarAtivoMaterial(material) {
+    const ativar = !material.ativo;
+    if (!ativar && !confirm(`Desativar "${material.nome}"? Ele some da entrada e saída, mas o histórico continua.`)) {
+        return;
+    }
+    try {
+        await chamarApi(`/materiais/${material.id}/ativo`, {
+            method: "PATCH",
+            body: JSON.stringify({ ativo: ativar }),
+        });
+        mostrarMensagem(`"${material.nome}" ${ativar ? "reativado" : "desativado"}.`, "sucesso");
+        await atualizarTela();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+    }
+}
+
+async function excluirMaterial(material) {
+    if (!confirm(`Excluir "${material.nome}" definitivamente?`)) {
+        return;
+    }
+    try {
+        await chamarApi(`/materiais/${material.id}`, { method: "DELETE" });
+        mostrarMensagem(`"${material.nome}" excluído.`, "sucesso");
+        await atualizarTela();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+    }
+}
+
+function criarAcoesMaterial(material) {
+    const acoes = document.createElement("div");
+    acoes.className = "acoes tabela";
+    acoes.appendChild(criarBotao("Editar", "botao-secundario", () => iniciarEdicaoMaterial(material)));
+    acoes.appendChild(
+        criarBotao(material.ativo ? "Desativar" : "Reativar", "botao-secundario", () => alterarAtivoMaterial(material)),
+    );
+    acoes.appendChild(criarBotao("Excluir", "botao-secundario perigo", () => excluirMaterial(material)));
+    return acoes;
+}
+
 async function carregarMateriais() {
+    const parametros = new URLSearchParams();
     const busca = document.getElementById("busca").value.trim();
-    const caminho = busca ? "/materiais?busca=" + encodeURIComponent(busca) : "/materiais";
-    const materiais = await chamarApi(caminho);
+    if (busca) {
+        parametros.set("busca", busca);
+    }
+    // Admin precisa ver os desativados para poder reativar
+    if (ehAdmin()) {
+        parametros.set("incluir_inativos", "true");
+    }
+    const materiais = await chamarApi("/materiais?" + parametros);
 
     const tabela = document.getElementById("tabela-materiais");
     tabela.replaceChildren();
     if (materiais.length === 0) {
         const celula = criarElemento("td", busca ? "Nenhum item encontrado." : "Nenhum item cadastrado ainda.", "vazio");
-        celula.colSpan = 6;
+        celula.colSpan = ehAdmin() ? 7 : 6;
         const linha = document.createElement("tr");
         linha.appendChild(celula);
         tabela.appendChild(linha);
@@ -90,6 +145,14 @@ async function carregarMateriais() {
         const celulaSituacao = document.createElement("td");
         celulaSituacao.appendChild(criarEtiqueta(material));
         linha.appendChild(celulaSituacao);
+        if (ehAdmin()) {
+            const celulaAcoes = document.createElement("td");
+            celulaAcoes.appendChild(criarAcoesMaterial(material));
+            linha.appendChild(celulaAcoes);
+        }
+        if (!material.ativo) {
+            linha.className = "inativo";
+        }
         tabela.appendChild(linha);
     }
 }
@@ -300,15 +363,48 @@ async function atualizarTela() {
     }
 }
 
+// Mesmo esquema dos colaboradores: null quer dizer "cadastrando"
+let materialEmEdicao = null;
+
+function iniciarEdicaoMaterial(material) {
+    materialEmEdicao = material;
+    const form = document.getElementById("form-material");
+    // Item antigo pode ter uma unidade fora da lista atual; adiciona a opção para não aparecer em branco
+    const selectUnidade = form.elements.unidade;
+    if (![...selectUnidade.options].some((opcao) => opcao.value === material.unidade)) {
+        selectUnidade.appendChild(criarElemento("option", material.unidade));
+    }
+    for (const campo of ["nome", "categoria", "unidade", "estoque_minimo"]) {
+        form.elements[campo].value = material[campo];
+    }
+    document.getElementById("material-em-edicao").textContent = material.nome;
+    document.getElementById("aviso-edicao-material").hidden = false;
+    document.getElementById("botao-salvar-material").textContent = "Salvar alterações";
+    abrirAba(document.querySelector('[data-aba="aba-cadastro"]'));
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelarEdicaoMaterial() {
+    materialEmEdicao = null;
+    document.getElementById("form-material").reset();
+    document.getElementById("aviso-edicao-material").hidden = true;
+    document.getElementById("botao-salvar-material").textContent = "Cadastrar";
+}
+
+document.getElementById("cancelar-edicao-material").addEventListener("click", cancelarEdicaoMaterial);
+
 document.getElementById("form-material").addEventListener("submit", async (evento) => {
     evento.preventDefault();
-    const form = evento.target;
-    const dados = Object.fromEntries(new FormData(form));
+    const dados = Object.fromEntries(new FormData(evento.target));
     dados.estoque_minimo = Number(dados.estoque_minimo);
+    const editando = materialEmEdicao !== null;
     try {
-        const material = await chamarApi("/materiais", { method: "POST", body: JSON.stringify(dados) });
-        mostrarMensagem(`"${material.nome}" cadastrado com sucesso.`, "sucesso");
-        form.reset();
+        const material = await chamarApi(
+            editando ? `/materiais/${materialEmEdicao.id}` : "/materiais",
+            { method: editando ? "PUT" : "POST", body: JSON.stringify(dados) },
+        );
+        mostrarMensagem(`"${material.nome}" ${editando ? "atualizado" : "cadastrado com sucesso"}.`, "sucesso");
+        cancelarEdicaoMaterial();
         await atualizarTela();
     } catch (erro) {
         mostrarMensagem(erro.message, "erro");
@@ -390,18 +486,20 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
 });
 
 // Cada botão de aba guarda em data-aba o id da seção que ele mostra
-document.querySelectorAll(".aba").forEach((botao) => {
-    botao.addEventListener("click", () => {
-        document.querySelectorAll(".aba").forEach((outro) => {
-            const ativo = outro === botao;
-            outro.classList.toggle("ativa", ativo);
-            document.getElementById(outro.dataset.aba).hidden = !ativo;
-        });
-        // Abas de consulta e gestão usam a largura toda; os alertas só ajudam em quem está movimentando
-        const telaCheia = botao.hasAttribute("data-tela-cheia");
-        document.querySelector(".alertas").hidden = telaCheia;
-        document.querySelector(".grade").classList.toggle("uma-coluna", telaCheia);
+function abrirAba(botao) {
+    document.querySelectorAll(".aba").forEach((outro) => {
+        const ativo = outro === botao;
+        outro.classList.toggle("ativa", ativo);
+        document.getElementById(outro.dataset.aba).hidden = !ativo;
     });
+    // Abas de consulta e gestão usam a largura toda; os alertas só ajudam em quem está movimentando
+    const telaCheia = botao.hasAttribute("data-tela-cheia");
+    document.querySelector(".alertas").hidden = telaCheia;
+    document.querySelector(".grade").classList.toggle("uma-coluna", telaCheia);
+}
+
+document.querySelectorAll(".aba").forEach((botao) => {
+    botao.addEventListener("click", () => abrirAba(botao));
 });
 
 // Mostra validade na entrada e setor na saída

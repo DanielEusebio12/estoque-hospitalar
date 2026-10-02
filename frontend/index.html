@@ -100,6 +100,10 @@
                 </div>
 
                 <div id="aba-cadastro" hidden>
+                    <div id="aviso-edicao-material" class="aviso-edicao" hidden>
+                        <span>Editando <strong id="material-em-edicao"></strong></span>
+                        <button type="button" id="cancelar-edicao-material" class="botao-secundario">Cancelar</button>
+                    </div>
                     <form id="form-material">
                         <label>Nome <input name="nome" required minlength="2" placeholder="Ex.: Dipirona 500mg"></label>
 
@@ -135,7 +139,7 @@
 
                         <label>Estoque mínimo <input name="estoque_minimo" type="number" min="0" value="0"></label>
 
-                        <button type="submit" class="botao-principal">Cadastrar</button>
+                        <button type="submit" id="botao-salvar-material" class="botao-principal">Cadastrar</button>
                     </form>
                 </div>
 
@@ -236,6 +240,7 @@
                             <th class="numero">Mínimo</th>
                             <th class="numero">Saldo</th>
                             <th>Situação</th>
+                            <th class="so-admin" hidden>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-materiais"></tbody>

@@ -73,7 +73,8 @@ class ColaboradorEntrada(BaseModel):
         return valor
 
 
-class AcessoEntrada(BaseModel):
+# Usado para ativar/desativar tanto colaboradores quanto materiais
+class AtivoEntrada(BaseModel):
     ativo: bool
 
 
@@ -105,6 +106,13 @@ SQL_MATERIAIS_COM_SALDO = (
     f"SELECT m.*, {SQL_SALDO} AS saldo "
     "FROM materiais m LEFT JOIN movimentacoes mv ON mv.material_id = m.id"
 )
+
+
+def tem_movimentacoes(conn, material_id: int) -> bool:
+    linha = conn.execute(
+        "SELECT 1 FROM movimentacoes WHERE material_id = ? LIMIT 1", (material_id,)
+    ).fetchone()
+    return linha is not None
 
 
 def calcular_saldo(conn, material_id: int) -> int:
@@ -186,13 +194,86 @@ def criar_material(material: MaterialEntrada, usuario: dict = Depends(exigir_adm
     return {"id": novo_id, **material.model_dump()}
 
 
+@app.put("/materiais/{material_id}")
+def editar_material(
+    material_id: int, material: MaterialEntrada, usuario: dict = Depends(exigir_admin)
+):
+    try:
+        with conectar() as conn:
+            atual = conn.execute(
+                "SELECT unidade FROM materiais WHERE id = ?", (material_id,)
+            ).fetchone()
+            if atual is None:
+                raise HTTPException(status_code=404, detail="Material não encontrado")
+            # Trocar "comprimido" por "caixa" mudaria o sentido de todas as quantidades já registradas
+            if material.unidade != atual["unidade"] and tem_movimentacoes(conn, material_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Não é possível mudar a unidade de um item que já tem movimentações",
+                )
+            conn.execute(
+                "UPDATE materiais SET nome = ?, categoria = ?, unidade = ?, estoque_minimo = ? "
+                "WHERE id = ?",
+                (material.nome, material.categoria, material.unidade, material.estoque_minimo, material_id),
+            )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Já existe um material com esse nome")
+    return {"id": material_id, **material.model_dump()}
+
+
+@app.patch("/materiais/{material_id}/ativo")
+def alterar_ativo_material(
+    material_id: int, dados: AtivoEntrada, usuario: dict = Depends(exigir_admin)
+):
+    with conectar() as conn:
+        existe = conn.execute("SELECT 1 FROM materiais WHERE id = ?", (material_id,)).fetchone()
+        if existe is None:
+            raise HTTPException(status_code=404, detail="Material não encontrado")
+        if not dados.ativo:
+            # Desativar com saldo esconderia um estoque que ainda existe fisicamente
+            saldo = calcular_saldo(conn, material_id)
+            if saldo > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Não é possível desativar um item com saldo ({saldo}). Registre a saída antes",
+                )
+        conn.execute(
+            "UPDATE materiais SET ativo = ? WHERE id = ?", (int(dados.ativo), material_id)
+        )
+    return {"id": material_id, "ativo": dados.ativo}
+
+
+@app.delete("/materiais/{material_id}", status_code=204)
+def excluir_material(material_id: int, usuario: dict = Depends(exigir_admin)):
+    with conectar() as conn:
+        existe = conn.execute("SELECT 1 FROM materiais WHERE id = ?", (material_id,)).fetchone()
+        if existe is None:
+            raise HTTPException(status_code=404, detail="Material não encontrado")
+        # Excluir só serve para cadastro errado; com movimentações apagaria o histórico
+        if tem_movimentacoes(conn, material_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Item com movimentações não pode ser excluído. Use desativar",
+            )
+        conn.execute("DELETE FROM materiais WHERE id = ?", (material_id,))
+
+
 @app.get("/materiais")
-def listar_materiais(busca: str | None = None, usuario: dict = Depends(usuario_logado)):
+def listar_materiais(
+    busca: str | None = None,
+    incluir_inativos: bool = False,
+    usuario: dict = Depends(usuario_logado),
+):
     sql = SQL_MATERIAIS_COM_SALDO
+    condicoes = []
     parametros = []
+    if not incluir_inativos:
+        condicoes.append("m.ativo = 1")
     if busca:
-        sql += " WHERE m.nome LIKE ?"
+        condicoes.append("m.nome LIKE ?")
         parametros.append(f"%{busca}%")
+    if condicoes:
+        sql += " WHERE " + " AND ".join(condicoes)
     sql += " GROUP BY m.id ORDER BY m.nome"
     with conectar() as conn:
         linhas = conn.execute(sql, parametros).fetchall()
@@ -230,7 +311,10 @@ def consultar_saldo(material_id: int, usuario: dict = Depends(usuario_logado)):
 @app.get("/alertas/estoque-baixo")
 def alertas_estoque_baixo(usuario: dict = Depends(usuario_logado)):
     # HAVING porque o saldo só existe depois do agrupamento
-    sql = SQL_MATERIAIS_COM_SALDO + " GROUP BY m.id HAVING saldo < m.estoque_minimo ORDER BY m.nome"
+    sql = (
+        SQL_MATERIAIS_COM_SALDO
+        + " WHERE m.ativo = 1 GROUP BY m.id HAVING saldo < m.estoque_minimo ORDER BY m.nome"
+    )
     with conectar() as conn:
         linhas = conn.execute(sql).fetchall()
     return [
@@ -307,7 +391,7 @@ def editar_colaborador(
 
 
 @app.patch("/colaboradores/{colaborador_id}/acesso")
-def alterar_acesso(colaborador_id: int, dados: AcessoEntrada, gestor: dict = Depends(exigir_admin)):
+def alterar_acesso(colaborador_id: int, dados: AtivoEntrada, gestor: dict = Depends(exigir_admin)):
     with conectar() as conn:
         alvo = conn.execute(
             "SELECT id, perfil FROM colaboradores WHERE id = ?", (colaborador_id,)
@@ -392,10 +476,12 @@ def registrar_movimentacao(mov: MovimentacaoEntrada, usuario: dict = Depends(usu
         # Trava a escrita já no início para duas saídas simultâneas não deixarem o saldo negativo
         conn.execute("BEGIN IMMEDIATE")
         material = conn.execute(
-            "SELECT categoria FROM materiais WHERE id = ?", (mov.material_id,)
+            "SELECT categoria, ativo FROM materiais WHERE id = ?", (mov.material_id,)
         ).fetchone()
         if material is None:
             raise HTTPException(status_code=404, detail="Material não encontrado")
+        if not material["ativo"]:
+            raise HTTPException(status_code=409, detail="Este item está desativado")
 
         # O responsável vem da sessão, e não do formulário, para ninguém registrar em nome de outro
         verificar_permissao(usuario, mov.tipo, material["categoria"])

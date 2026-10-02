@@ -490,6 +490,16 @@ td:first-child {
     font-weight: 500;
 }
 
+/* Item desativado continua na tabela (para o admin poder reativar), mas apagado */
+tr.inativo td:not(:last-child) {
+    opacity: 0.55;
+}
+
+.acoes.tabela {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+}
+
 .numero {
     text-align: right;
     font-variant-numeric: tabular-nums;

@@ -49,6 +49,7 @@ def criar_tabelas():
 
         # Colunas adicionadas depois; o ALTER TABLE atualiza bancos que já existiam sem perder dados
         adicionar_coluna(conn, "movimentacoes", "colaborador_id", "INTEGER REFERENCES colaboradores(id)")
+        adicionar_coluna(conn, "materiais", "ativo", "INTEGER NOT NULL DEFAULT 1")
         adicionar_coluna(conn, "colaboradores", "usuario", "TEXT")
         adicionar_coluna(conn, "colaboradores", "senha_hash", "TEXT")
         adicionar_coluna(conn, "colaboradores", "perfil", "TEXT NOT NULL DEFAULT 'comum'")
