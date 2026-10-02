@@ -125,6 +125,18 @@ def consultar_saldo(material_id: int):
     }
 
 
+@app.get("/alertas/estoque-baixo")
+def alertas_estoque_baixo():
+    # HAVING porque o saldo só existe depois do agrupamento
+    sql = SQL_MATERIAIS_COM_SALDO + " GROUP BY m.id HAVING saldo < m.estoque_minimo ORDER BY m.nome"
+    with conectar() as conn:
+        linhas = conn.execute(sql).fetchall()
+    return [
+        {**dict(linha), "quantidade_para_repor": linha["estoque_minimo"] - linha["saldo"]}
+        for linha in linhas
+    ]
+
+
 @app.post("/movimentacoes", status_code=201)
 def registrar_movimentacao(mov: MovimentacaoEntrada):
     with conectar() as conn:
