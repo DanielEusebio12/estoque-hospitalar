@@ -163,9 +163,13 @@ function mostrarIndicador(id, valor) {
     elemento.classList.toggle("tem-valor", valor > 0);
 }
 
+// Guardada para o painel do item não precisar buscar na API a cada troca do select
+let materiaisAtivos = [];
+
 // Usa a lista completa, sem o filtro da busca, para o select e os indicadores
 async function carregarListaCompleta() {
     const materiais = await chamarApi("/materiais");
+    materiaisAtivos = materiais;
     const select = document.getElementById("select-material");
     const selecionado = select.value;
     select.replaceChildren();
@@ -196,6 +200,9 @@ async function carregarAlertas() {
     const alertas = await chamarApi("/alertas/estoque-baixo");
     // O total vem da API para a regra de "abaixo do mínimo" ficar só no servidor
     mostrarIndicador("total-alertas", alertas.length);
+    const contador = document.getElementById("contador-alertas");
+    contador.textContent = alertas.length;
+    contador.hidden = alertas.length === 0;
 
     const lista = document.getElementById("lista-alertas");
     lista.replaceChildren();
@@ -351,6 +358,63 @@ async function carregarHistorico() {
     }
 }
 
+// Barra cheia = o dobro do mínimo, então a marca do mínimo fica sempre no meio
+function calcularNivel(material) {
+    if (material.estoque_minimo === 0) {
+        return material.saldo > 0 ? 100 : 0;
+    }
+    return Math.min(100, (material.saldo / (material.estoque_minimo * 2)) * 100);
+}
+
+async function atualizarPainelItem() {
+    const id = Number(document.getElementById("select-material").value);
+    const material = materiaisAtivos.find((item) => item.id === id);
+    document.getElementById("painel-vazio").hidden = Boolean(material);
+    document.getElementById("painel-conteudo").hidden = !material;
+    if (!material) {
+        return;
+    }
+
+    document.getElementById("painel-nome").textContent = material.nome;
+    document.getElementById("painel-categoria").textContent = `${material.categoria} · ${material.unidade}`;
+    document.getElementById("painel-saldo").textContent = material.saldo;
+    document.getElementById("painel-minimo").textContent = material.estoque_minimo;
+    document.getElementById("painel-situacao").replaceChildren(criarEtiqueta(material));
+
+    const barra = document.getElementById("painel-barra");
+    barra.style.width = calcularNivel(material) + "%";
+    barra.className = "barra-preenchida";
+    if (material.saldo === 0) {
+        barra.classList.add("perigo");
+    } else if (material.saldo < material.estoque_minimo) {
+        barra.classList.add("alerta");
+    }
+
+    const movimentacoes = await chamarApi(`/movimentacoes?material_id=${material.id}`);
+    const lista = document.getElementById("painel-ultimas");
+    lista.replaceChildren();
+    if (movimentacoes.length === 0) {
+        lista.appendChild(criarElemento("li", "Nenhuma movimentação ainda.", "vazio"));
+        return;
+    }
+    for (const mov of movimentacoes.slice(0, 5)) {
+        const item = document.createElement("li");
+        const entrada = mov.tipo === "entrada";
+        item.appendChild(criarElemento("span", entrada ? "↓" : "↑", `seta-movimento ${mov.tipo}`));
+
+        const texto = document.createElement("div");
+        texto.className = "movimento-texto";
+        texto.appendChild(criarElemento("span", entrada ? "Entrada" : `Saída · ${mov.setor ?? "—"}`));
+        texto.appendChild(criarElemento("small", `${formatarData(mov.data)} · ${mov.colaborador ?? "Não registrado"}`));
+        item.appendChild(texto);
+
+        item.appendChild(
+            criarElemento("span", `${entrada ? "+" : "−"}${mov.quantidade}`, "movimento-quantidade"),
+        );
+        lista.appendChild(item);
+    }
+}
+
 async function atualizarTela() {
     const carregamentos = [carregarMateriais(), carregarListaCompleta(), carregarAlertas(), carregarHistorico()];
     if (ehAdmin()) {
@@ -358,6 +422,8 @@ async function atualizarTela() {
     }
     try {
         await Promise.all(carregamentos);
+        // Depois das listas, porque o painel usa o saldo que acabou de ser carregado
+        await atualizarPainelItem();
     } catch (erro) {
         mostrarMensagem("Erro ao carregar dados: " + erro.message, "erro");
     }
@@ -517,6 +583,10 @@ document.getElementById("busca").addEventListener("input", () => {
     carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
 });
 
+document.getElementById("select-material").addEventListener("change", () => {
+    atualizarPainelItem().catch((erro) => mostrarMensagem(erro.message, "erro"));
+});
+
 for (const id of ["filtro-material", "filtro-tipo"]) {
     document.getElementById(id).addEventListener("change", () => {
         carregarHistorico().catch((erro) => mostrarMensagem(erro.message, "erro"));
@@ -538,6 +608,10 @@ async function iniciar() {
     document.getElementById("usuario-nome").textContent = usuarioAtual.nome;
     document.getElementById("usuario-perfil").textContent =
         `${NOMES_PERFIL[usuarioAtual.perfil]} · ${usuarioAtual.cargo}`;
+    // Iniciais do primeiro e do último nome: "Daniel Eusebio" vira "DE"
+    const partesNome = usuarioAtual.nome.trim().split(/\s+/);
+    document.getElementById("usuario-avatar").textContent =
+        (partesNome[0][0] + (partesNome.length > 1 ? partesNome.at(-1)[0] : "")).toUpperCase();
 
     if (ehAdmin()) {
         document.querySelectorAll(".so-admin").forEach((elemento) => (elemento.hidden = false));

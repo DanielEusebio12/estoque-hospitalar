@@ -24,6 +24,7 @@
                     <strong id="usuario-nome"></strong>
                     <span id="usuario-perfil"></span>
                 </div>
+                <div id="usuario-avatar" class="avatar" aria-hidden="true"></div>
                 <button type="button" id="botao-sair" class="botao-secundario">Sair</button>
             </div>
         </div>
@@ -31,17 +32,32 @@
 
     <main>
         <section class="resumo">
-            <div class="cartao indicador">
-                <span class="indicador-rotulo">Itens cadastrados</span>
-                <strong id="total-materiais">–</strong>
+            <div class="cartao indicador primario">
+                <div class="indicador-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
+                </div>
+                <div>
+                    <span class="indicador-rotulo">Itens cadastrados</span>
+                    <strong id="total-materiais">–</strong>
+                </div>
             </div>
-            <div class="cartao indicador">
-                <span class="indicador-rotulo">Abaixo do mínimo</span>
-                <strong id="total-alertas" class="valor-alerta">–</strong>
+            <div class="cartao indicador alerta">
+                <div class="indicador-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                </div>
+                <div>
+                    <span class="indicador-rotulo">Abaixo do mínimo</span>
+                    <strong id="total-alertas" class="valor-alerta">–</strong>
+                </div>
             </div>
-            <div class="cartao indicador">
-                <span class="indicador-rotulo">Sem estoque</span>
-                <strong id="total-zerados" class="valor-perigo">–</strong>
+            <div class="cartao indicador perigo">
+                <div class="indicador-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+                </div>
+                <div>
+                    <span class="indicador-rotulo">Sem estoque</span>
+                    <strong id="total-zerados" class="valor-perigo">–</strong>
+                </div>
             </div>
         </section>
 
@@ -57,7 +73,7 @@
                     <button type="button" class="aba so-admin" data-aba="aba-colaboradores" data-sem-alertas hidden>Colaboradores</button>
                 </nav>
 
-                <div id="aba-movimentacao">
+                <div id="aba-movimentacao" class="layout-movimentacao">
                     <form id="form-movimentacao">
                         <div class="seletor-tipo">
                             <label class="opcao-tipo entrada">
@@ -98,6 +114,40 @@
 
                         <button type="submit" class="botao-principal">Registrar</button>
                     </form>
+
+                    <!-- Mostra a situação do item escolhido para conferir antes de registrar -->
+                    <aside class="painel-item">
+                        <p id="painel-vazio" class="texto-suave">Cadastre um item para começar.</p>
+                        <div id="painel-conteudo" hidden>
+                            <span class="painel-rotulo">Item selecionado</span>
+                            <h3 id="painel-nome"></h3>
+                            <span id="painel-categoria" class="painel-categoria"></span>
+
+                            <div class="painel-numeros">
+                                <div>
+                                    <span>Saldo</span>
+                                    <strong id="painel-saldo"></strong>
+                                </div>
+                                <div>
+                                    <span>Mínimo</span>
+                                    <strong id="painel-minimo"></strong>
+                                </div>
+                                <div>
+                                    <span>Situação</span>
+                                    <div id="painel-situacao"></div>
+                                </div>
+                            </div>
+
+                            <!-- A marca do mínimo fica no meio: barra cheia = o dobro do mínimo -->
+                            <div class="barra-nivel">
+                                <div id="painel-barra" class="barra-preenchida"></div>
+                                <div class="marca-minimo" title="Estoque mínimo"></div>
+                            </div>
+
+                            <span class="painel-rotulo">Últimas movimentações</span>
+                            <ul id="painel-ultimas" class="painel-ultimas"></ul>
+                        </div>
+                    </aside>
                 </div>
 
                 <div id="aba-cadastro" hidden>
@@ -245,7 +295,7 @@
             </section>
 
             <section class="cartao alertas">
-                <h2>Alertas de estoque baixo</h2>
+                <h2>Alertas de estoque baixo <span id="contador-alertas" class="contador" hidden></span></h2>
                 <ul id="lista-alertas"></ul>
             </section>
         </div>

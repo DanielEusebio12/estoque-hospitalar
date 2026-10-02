@@ -47,13 +47,18 @@ h2 {
 /* ---------- Topo ---------- */
 
 .topo {
-    background: var(--superficie);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--borda);
-    padding: 14px 24px;
+    padding: 12px 16px;
 }
 
+/* Mesma largura útil do main (1100 - 2×16 de padding) para o logo alinhar com os cartões */
 .marca {
-    max-width: 1100px;
+    max-width: 1068px;
     margin: 0 auto;
     display: flex;
     align-items: center;
@@ -107,19 +112,60 @@ main {
 
 .indicador {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Faixa colorida na esquerda identifica o tipo do indicador */
+.indicador::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--cor-indicador);
+}
+
+.indicador.primario {
+    --cor-indicador: var(--primaria);
+    --fundo-indicador: var(--primaria-clara);
+}
+
+.indicador.alerta {
+    --cor-indicador: var(--alerta);
+    --fundo-indicador: var(--alerta-clara);
+}
+
+.indicador.perigo {
+    --cor-indicador: var(--perigo);
+    --fundo-indicador: var(--perigo-clara);
+}
+
+.indicador-icone {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--fundo-indicador);
+    color: var(--cor-indicador);
 }
 
 .indicador-rotulo {
+    display: block;
     font-size: 0.8rem;
     color: var(--texto-suave);
     font-weight: 500;
 }
 
 .indicador strong {
-    font-size: 1.8rem;
+    display: block;
+    font-size: 1.6rem;
     font-weight: 700;
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
 }
 
@@ -177,10 +223,163 @@ main {
 /* ---------- Formulários ---------- */
 
 /* Com o cartão na largura toda, campos muito largos ficam difíceis de ler */
-#form-movimentacao,
 #form-material,
 #form-colaborador {
     max-width: 640px;
+}
+
+/* ---------- Entrada e saída: formulário + painel do item ---------- */
+
+.layout-movimentacao {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 28px;
+    align-items: start;
+}
+
+@media (max-width: 820px) {
+    .layout-movimentacao {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.painel-item {
+    background: var(--superficie-suave);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    padding: 20px;
+}
+
+.painel-rotulo {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--texto-suave);
+}
+
+.painel-item h3 {
+    margin: 6px 0 2px;
+    font-size: 1.15rem;
+}
+
+.painel-categoria {
+    font-size: 0.85rem;
+    color: var(--texto-suave);
+}
+
+.painel-numeros {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 18px 0 14px;
+}
+
+.painel-numeros span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+    margin-bottom: 4px;
+}
+
+.painel-numeros strong {
+    font-size: 1.4rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.barra-nivel {
+    position: relative;
+    height: 8px;
+    margin-bottom: 22px;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+.barra-preenchida {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--sucesso);
+    transition: width 0.3s, background 0.3s;
+}
+
+.barra-preenchida.alerta {
+    background: var(--alerta);
+}
+
+.barra-preenchida.perigo {
+    background: var(--perigo);
+}
+
+.marca-minimo {
+    position: absolute;
+    left: 50%;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    background: var(--texto-suave);
+    border-radius: 1px;
+}
+
+.painel-ultimas {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+}
+
+.painel-ultimas li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--borda);
+    font-size: 0.85rem;
+}
+
+.painel-ultimas li:last-child {
+    border-bottom: none;
+}
+
+.painel-ultimas li.vazio {
+    color: var(--texto-suave);
+}
+
+.seta-movimento {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+.seta-movimento.entrada {
+    background: var(--sucesso-clara);
+    color: var(--sucesso);
+}
+
+.seta-movimento.saida {
+    background: var(--alerta-clara);
+    color: var(--alerta);
+}
+
+.movimento-texto {
+    flex: 1;
+    min-width: 0;
+}
+
+.movimento-texto small {
+    display: block;
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+}
+
+.movimento-quantidade {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 form label {
@@ -510,6 +709,39 @@ td.vazio {
 .usuario-dados span {
     color: var(--texto-suave);
     font-size: 0.75rem;
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--primaria-clara);
+    color: var(--primaria-escura);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+/* Em tela pequena fica só o avatar e o botão sair */
+@media (max-width: 560px) {
+    .usuario-dados {
+        display: none;
+    }
+}
+
+.contador {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: var(--alerta-clara);
+    color: var(--alerta);
+    font-size: 0.75rem;
+    vertical-align: middle;
 }
 
 .botao-secundario {
