@@ -461,59 +461,6 @@ select:focus {
     box-shadow: 0 0 0 3px var(--primaria-clara);
 }
 
-/* Entrada/Saída como dois botões: o radio fica invisível e o span é o que aparece */
-.seletor-tipo {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-.opcao-tipo {
-    position: relative;
-    margin: 0;
-}
-
-.opcao-tipo input {
-    position: absolute;
-    opacity: 0;
-    width: 1px;
-    height: 1px;
-}
-
-.opcao-tipo span {
-    display: block;
-    padding: 10px;
-    text-align: center;
-    border: 1px solid var(--borda);
-    border-radius: var(--raio-pequeno);
-    color: var(--texto-suave);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.opcao-tipo span:hover {
-    border-color: #cbd5e1;
-    color: var(--texto);
-}
-
-.opcao-tipo input:focus-visible + span {
-    box-shadow: 0 0 0 3px var(--primaria-clara);
-}
-
-.opcao-tipo.entrada input:checked + span {
-    background: var(--sucesso-clara);
-    border-color: var(--sucesso);
-    color: var(--sucesso);
-}
-
-.opcao-tipo.saida input:checked + span {
-    background: var(--alerta-clara);
-    border-color: var(--alerta);
-    color: var(--alerta);
-}
-
 /* ---------- Alertas ---------- */
 
 /* Com a largura toda, os alertas viram uma grade de cartões lado a lado */

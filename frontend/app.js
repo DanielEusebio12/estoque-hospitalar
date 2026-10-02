@@ -639,10 +639,13 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
 // Cada botão de aba guarda em data-aba o id da seção que ele mostra
 function abrirAba(botao) {
     document.querySelectorAll(".aba").forEach((outro) => {
-        const ativo = outro === botao;
-        outro.classList.toggle("ativa", ativo);
-        document.getElementById(outro.dataset.aba).hidden = !ativo;
+        outro.classList.toggle("ativa", outro === botao);
+        // Saída e Entrada apontam para a mesma seção, então compara pelo id e não pelo botão
+        document.getElementById(outro.dataset.aba).hidden = outro.dataset.aba !== botao.dataset.aba;
     });
+    if (botao.dataset.tipo) {
+        definirTipo(botao.dataset.tipo);
+    }
     // Nas abas de consulta e gestão os alertas só ocupariam espaço
     document.querySelectorAll(".alertas").forEach((cartao) => {
         cartao.hidden = botao.hasAttribute("data-sem-alertas");
@@ -654,17 +657,15 @@ document.querySelectorAll(".aba").forEach((botao) => {
 });
 
 // Mostra validade na entrada e setor na saída
-function atualizarCamposPorTipo() {
-    const ehEntrada = document.querySelector("input[name=tipo]:checked").value === "entrada";
+function definirTipo(tipo) {
+    const ehEntrada = tipo === "entrada";
+    document.getElementById("campo-tipo").value = tipo;
     document.getElementById("campos-entrada").hidden = !ehEntrada;
     document.getElementById("campos-saida").hidden = ehEntrada;
+    document.getElementById("botao-registrar").textContent = ehEntrada ? "Registrar entrada" : "Registrar saída";
 }
 
-document.querySelectorAll("input[name=tipo]").forEach((opcao) => {
-    opcao.addEventListener("change", atualizarCamposPorTipo);
-});
-// O navegador pode restaurar "Saída" ao recarregar a página, então ajusta os campos já na abertura
-atualizarCamposPorTipo();
+definirTipo("saida");
 
 document.getElementById("busca").addEventListener("input", () => {
     carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
@@ -702,6 +703,10 @@ async function iniciar() {
 
     if (ehAdmin()) {
         document.querySelectorAll(".so-admin").forEach((elemento) => (elemento.hidden = false));
+    }
+    // Espelha verificar_permissao da API: só farmacêutico e super admin registram entrada
+    if (usuarioAtual.perfil === "super_admin" || usuarioAtual.cargo === "Farmacêutico") {
+        document.querySelectorAll(".so-entrada").forEach((elemento) => (elemento.hidden = false));
     }
     document.getElementById("aviso-historico").textContent = ehAdmin()
         ? "Todas as movimentações, das mais recentes para as mais antigas."

@@ -73,7 +73,9 @@
         <div class="grade">
             <section class="cartao">
                 <nav class="abas">
-                    <button type="button" class="aba ativa" data-aba="aba-movimentacao">Entrada e saída</button>
+                    <!-- Saída e Entrada usam o mesmo formulário; data-tipo diz qual movimentação a aba registra -->
+                    <button type="button" class="aba ativa" data-aba="aba-movimentacao" data-tipo="saida">Saída</button>
+                    <button type="button" class="aba so-entrada" data-aba="aba-movimentacao" data-tipo="entrada" hidden>Entrada</button>
                     <!-- data-sem-alertas: a aba esconde o cartão de alertas -->
                     <button type="button" class="aba" data-aba="aba-estoque" data-sem-alertas>Estoque</button>
                     <button type="button" class="aba" data-aba="aba-historico" data-sem-alertas>Histórico</button>
@@ -84,16 +86,8 @@
 
                 <div id="aba-movimentacao" class="layout-movimentacao">
                     <form id="form-movimentacao">
-                        <div class="seletor-tipo">
-                            <label class="opcao-tipo entrada">
-                                <input type="radio" name="tipo" value="entrada" checked>
-                                <span>↓ Entrada</span>
-                            </label>
-                            <label class="opcao-tipo saida">
-                                <input type="radio" name="tipo" value="saida">
-                                <span>↑ Saída</span>
-                            </label>
-                        </div>
+                        <!-- Preenchido pela aba escolhida (Saída ou Entrada) -->
+                        <input type="hidden" name="tipo" id="campo-tipo" value="saida">
 
                         <label>Medicamento ou material
                             <select name="material_id" id="select-material" required></select>
@@ -123,7 +117,7 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="botao-principal">Registrar</button>
+                        <button type="submit" id="botao-registrar" class="botao-principal">Registrar saída</button>
                     </form>
 
                     <!-- Mostra a situação do item escolhido para conferir antes de registrar -->
