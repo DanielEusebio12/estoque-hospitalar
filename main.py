@@ -36,9 +36,9 @@ class MovimentacaoEntrada(BaseModel):
 
     @model_validator(mode="after")
     def validar_campos_por_tipo(self):
-        # Entrada precisa de lote/validade para rastreio; saída precisa do setor de destino
-        if self.tipo == "entrada" and (not self.lote or not self.validade):
-            raise ValueError("Entrada exige lote e validade")
+        # Entrada precisa da validade para controle de vencimento; saída precisa do setor de destino
+        if self.tipo == "entrada" and not self.validade:
+            raise ValueError("Entrada exige a validade")
         if self.tipo == "saida" and not self.setor:
             raise ValueError("Saída exige o setor de destino")
         return self
