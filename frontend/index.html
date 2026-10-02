@@ -50,6 +50,7 @@
                 <nav class="abas">
                     <button type="button" class="aba ativa" data-aba="aba-movimentacao">Entrada e saída</button>
                     <!-- data-tela-cheia: a aba ocupa a largura toda e esconde os alertas -->
+                    <button type="button" class="aba" data-aba="aba-estoque" data-tela-cheia>Estoque</button>
                     <button type="button" class="aba" data-aba="aba-historico" data-tela-cheia>Histórico</button>
                     <!-- A API é quem bloqueia de verdade; esconder as abas é só para não mostrar o que a pessoa não pode usar -->
                     <button type="button" class="aba so-admin" data-aba="aba-cadastro" hidden>Cadastrar item</button>
@@ -185,6 +186,30 @@
                     <ul id="lista-colaboradores" class="lista-colaboradores"></ul>
                 </div>
 
+                <div id="aba-estoque" hidden>
+                    <div class="filtros">
+                        <label>Buscar
+                            <input id="busca" class="campo-busca" type="search" placeholder="Nome do item...">
+                        </label>
+                    </div>
+                    <div class="tabela-rolagem">
+                        <table class="tabela-compacta">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Categoria</th>
+                                    <th>Unidade</th>
+                                    <th class="numero">Mínimo</th>
+                                    <th class="numero">Saldo</th>
+                                    <th>Situação</th>
+                                    <th class="so-admin" hidden>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-materiais"></tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div id="aba-historico" hidden>
                     <p id="aviso-historico" class="texto-suave"></p>
                     <div class="filtros">
@@ -202,7 +227,7 @@
                         </label>
                     </div>
                     <div class="tabela-rolagem">
-                        <table class="tabela-historico">
+                        <table class="tabela-compacta tabela-historico">
                             <thead>
                                 <tr>
                                     <th>Data</th>
@@ -225,28 +250,6 @@
             </section>
         </div>
 
-        <section class="cartao cartao-tabela">
-            <div class="titulo-com-busca">
-                <h2>Estoque</h2>
-                <input id="busca" type="search" placeholder="Buscar por nome...">
-            </div>
-            <div class="tabela-rolagem">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Categoria</th>
-                            <th>Unidade</th>
-                            <th class="numero">Mínimo</th>
-                            <th class="numero">Saldo</th>
-                            <th>Situação</th>
-                            <th class="so-admin" hidden>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-materiais"></tbody>
-                </table>
-            </div>
-        </section>
     </main>
 
     <div id="mensagem" class="mensagem" role="status" aria-live="polite" hidden></div>
