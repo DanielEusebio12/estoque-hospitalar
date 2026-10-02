@@ -49,12 +49,12 @@
             <section class="cartao">
                 <nav class="abas">
                     <button type="button" class="aba ativa" data-aba="aba-movimentacao">Entrada e saída</button>
-                    <!-- data-tela-cheia: a aba ocupa a largura toda e esconde os alertas -->
-                    <button type="button" class="aba" data-aba="aba-estoque" data-tela-cheia>Estoque</button>
-                    <button type="button" class="aba" data-aba="aba-historico" data-tela-cheia>Histórico</button>
+                    <!-- data-sem-alertas: a aba esconde o cartão de alertas -->
+                    <button type="button" class="aba" data-aba="aba-estoque" data-sem-alertas>Estoque</button>
+                    <button type="button" class="aba" data-aba="aba-historico" data-sem-alertas>Histórico</button>
                     <!-- A API é quem bloqueia de verdade; esconder as abas é só para não mostrar o que a pessoa não pode usar -->
                     <button type="button" class="aba so-admin" data-aba="aba-cadastro" hidden>Cadastrar item</button>
-                    <button type="button" class="aba so-admin" data-aba="aba-colaboradores" data-tela-cheia hidden>Colaboradores</button>
+                    <button type="button" class="aba so-admin" data-aba="aba-colaboradores" data-sem-alertas hidden>Colaboradores</button>
                 </nav>
 
                 <div id="aba-movimentacao">

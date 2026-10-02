@@ -492,10 +492,8 @@ function abrirAba(botao) {
         outro.classList.toggle("ativa", ativo);
         document.getElementById(outro.dataset.aba).hidden = !ativo;
     });
-    // Abas de consulta e gestão usam a largura toda; os alertas só ajudam em quem está movimentando
-    const telaCheia = botao.hasAttribute("data-tela-cheia");
-    document.querySelector(".alertas").hidden = telaCheia;
-    document.querySelector(".grade").classList.toggle("uma-coluna", telaCheia);
+    // Nas abas de consulta e gestão os alertas só ocupariam espaço
+    document.querySelector(".alertas").hidden = botao.hasAttribute("data-sem-alertas");
 }
 
 document.querySelectorAll(".aba").forEach((botao) => {
