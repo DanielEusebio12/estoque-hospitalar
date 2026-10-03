@@ -113,6 +113,25 @@ function criarAcoesMaterial(material) {
     return acoes;
 }
 
+// Ids dos itens que aparecem no alerta de vencimento (preenchido por carregarVencimentos)
+let idsComVencimento = new Set();
+
+// Mesmas regras dos cards de resumo, para o número do card bater com a quantidade de linhas
+function combinaComSituacao(material, situacao) {
+    switch (situacao) {
+        case "abaixo":
+            return material.ativo && material.saldo < material.estoque_minimo;
+        case "zerado":
+            return material.ativo && material.saldo === 0;
+        case "vencimento":
+            return idsComVencimento.has(material.id);
+        case "desativado":
+            return !material.ativo;
+        default:
+            return true;
+    }
+}
+
 async function carregarMateriais() {
     const parametros = new URLSearchParams();
     const busca = document.getElementById("busca").value.trim();
@@ -123,12 +142,21 @@ async function carregarMateriais() {
     if (ehAdmin()) {
         parametros.set("incluir_inativos", "true");
     }
-    const materiais = await chamarApi("/materiais?" + parametros);
+    const situacao = document.getElementById("filtro-situacao").value;
+    const materiais = (await chamarApi("/materiais?" + parametros)).filter((material) =>
+        combinaComSituacao(material, situacao),
+    );
 
     const tabela = document.getElementById("tabela-materiais");
     tabela.replaceChildren();
     if (materiais.length === 0) {
-        const celula = criarElemento("td", busca ? "Nenhum item encontrado." : "Nenhum item cadastrado ainda.", "vazio");
+        let mensagem = "Nenhum item cadastrado ainda.";
+        if (situacao) {
+            mensagem = "Nenhum item nesta situação.";
+        } else if (busca) {
+            mensagem = "Nenhum item encontrado.";
+        }
+        const celula = criarElemento("td", mensagem, "vazio");
         celula.colSpan = ehAdmin() ? 8 : 7;
         const linha = document.createElement("tr");
         linha.appendChild(celula);
@@ -415,7 +443,9 @@ function criarEtiquetaPrazo(item) {
 
 async function carregarVencimentos() {
     const vencimentos = await chamarApi("/alertas/vencimento");
-    mostrarIndicador("total-vencimento", vencimentos.length);
+    // Um item pode ter várias validades no alerta; o card conta itens para bater com o filtro do estoque
+    idsComVencimento = new Set(vencimentos.map((vencimento) => vencimento.material_id));
+    mostrarIndicador("total-vencimento", idsComVencimento.size);
     const contador = document.getElementById("contador-vencimentos");
     contador.textContent = vencimentos.length;
     contador.hidden = vencimentos.length === 0;
@@ -546,6 +576,10 @@ async function atualizarTela() {
     }
     try {
         await Promise.all(carregamentos);
+        // O filtro "vencidos ou a vencer" depende dos vencimentos, que carregaram em paralelo com a tabela
+        if (document.getElementById("filtro-situacao").value === "vencimento") {
+            await carregarMateriais();
+        }
         // Depois das listas, porque o painel e os campos usam os itens que acabaram de ser carregados
         atualizarCamposMovimentacao();
         await atualizarPainelItem();
@@ -749,6 +783,21 @@ definirTipo("saida");
 
 document.getElementById("busca").addEventListener("input", () => {
     carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
+});
+
+document.getElementById("filtro-situacao").addEventListener("change", () => {
+    carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
+});
+
+// Card de resumo: abre o Estoque já filtrado pela situação do card
+document.querySelectorAll(".indicador[data-filtro]").forEach((card) => {
+    card.addEventListener("click", () => {
+        document.getElementById("filtro-situacao").value = card.dataset.filtro;
+        document.getElementById("busca").value = "";
+        abrirAba(document.querySelector('[data-aba="aba-estoque"]'));
+        carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
+        document.querySelector(".grade").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 });
 
 const campoBuscaItem = document.getElementById("busca-item");

@@ -110,6 +110,7 @@ main {
     margin-bottom: 20px;
 }
 
+/* Os cards são botões: tira o visual padrão de botão e mostra que dá para clicar */
 .indicador {
     display: flex;
     align-items: center;
@@ -117,6 +118,23 @@ main {
     padding: 16px 18px;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.indicador:hover {
+    transform: translateY(-2px);
+    border-color: var(--cor-indicador);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.indicador:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--fundo-indicador);
 }
 
 /* Faixa colorida na esquerda identifica o tipo do indicador */
