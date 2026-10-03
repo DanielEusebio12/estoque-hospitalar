@@ -167,61 +167,54 @@ function mostrarIndicador(id, valor) {
 // Guardada para a busca por código e o painel não precisarem chamar a API a cada tecla
 let materiaisAtivos = [];
 
-// Texto que aparece nas sugestões e no campo depois de escolher: "1221 — Dipirona 500mg"
-function textoDoItem(material) {
-    return material.codigo ? `${material.codigo} — ${material.nome}` : material.nome;
-}
-
-// Aceita o código exato (digitado ou do leitor de código de barras), a sugestão escolhida ou o nome exato
-function encontrarItem(texto) {
-    const procurado = texto.trim().toUpperCase();
-    if (!procurado) {
-        return null;
-    }
-    return (
-        materiaisAtivos.find((item) => item.codigo === procurado) ??
-        materiaisAtivos.find((item) => textoDoItem(item).toUpperCase() === procurado) ??
-        materiaisAtivos.find((item) => item.nome.trim().toUpperCase() === procurado) ??
-        null
-    );
+// Código exato, digitado ou lido pelo leitor de código de barras
+function encontrarPorCodigo(texto) {
+    const codigo = texto.trim().toUpperCase();
+    return codigo ? materiaisAtivos.find((item) => item.codigo === codigo) ?? null : null;
 }
 
 function itemSelecionado() {
-    const id = Number(document.getElementById("material-id").value);
+    const id = Number(document.getElementById("select-material").value);
     return materiaisAtivos.find((item) => item.id === id);
 }
 
-function selecionarItem(material) {
-    document.getElementById("material-id").value = material ? material.id : "";
-    atualizarDicaItem(material);
+// Chamado quando o item muda, venha ele do campo de código ou da caixa
+function aoMudarItem() {
+    atualizarDicaItem();
     atualizarCamposMovimentacao();
     atualizarPainelItem().catch((erro) => mostrarMensagem(erro.message, "erro"));
 }
 
-function atualizarDicaItem(material) {
+function atualizarDicaItem() {
     const dica = document.getElementById("item-encontrado");
-    const digitado = document.getElementById("busca-item").value.trim();
+    const material = itemSelecionado();
+    const codigoDigitado = document.getElementById("busca-item").value.trim();
     if (material) {
         dica.textContent = `✓ ${material.nome} · saldo ${material.saldo} ${material.unidade}`;
         dica.className = "dica ok";
-    } else {
-        dica.textContent = digitado ? "Nenhum item com esse código. Continue digitando o nome ou escolha na lista." : "";
+    } else if (codigoDigitado) {
+        dica.textContent = "Nenhum item com esse código.";
         dica.className = "dica erro";
+    } else {
+        dica.textContent = "";
     }
 }
 
-// Usa a lista completa, sem o filtro da busca, para as sugestões e os indicadores
+// Usa a lista completa, sem o filtro da busca, para a caixa de itens e os indicadores
 async function carregarListaCompleta() {
     const materiais = await chamarApi("/materiais");
     materiaisAtivos = materiais;
-    const sugestoes = document.getElementById("sugestoes-itens");
-    sugestoes.replaceChildren();
+    const select = document.getElementById("select-material");
+    const selecionado = select.value;
+    select.replaceChildren(criarElemento("option", "Selecione o item..."));
+    select.firstChild.value = "";
     for (const material of materiais) {
-        const opcao = document.createElement("option");
-        opcao.value = textoDoItem(material);
-        opcao.label = `saldo ${material.saldo} ${material.unidade}`;
-        sugestoes.appendChild(opcao);
+        const codigo = material.codigo ? `${material.codigo} — ` : "";
+        const opcao = criarElemento("option", `${codigo}${material.nome} (saldo: ${material.saldo} ${material.unidade})`);
+        opcao.value = material.id;
+        select.appendChild(opcao);
     }
+    select.value = selecionado;
 
     const filtro = document.getElementById("filtro-material");
     const filtroSelecionado = filtro.value;
@@ -682,11 +675,6 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
     evento.preventDefault();
     const form = evento.target;
     const dados = Object.fromEntries(new FormData(form));
-    if (!dados.material_id) {
-        mostrarMensagem("Escolha o item pelo código ou pelo nome.", "erro");
-        campoBuscaItem.focus();
-        return;
-    }
     dados.material_id = Number(dados.material_id);
     dados.quantidade = Number(dados.quantidade);
     // Envia só os campos do tipo escolhido; campo vazio vira null para o Pydantic validar
@@ -708,7 +696,7 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
         // Volta para a busca com o texto selecionado: o próximo código digitado ou lido substitui o atual
         campoBuscaItem.focus();
         campoBuscaItem.select();
-        atualizarDicaItem(itemSelecionado());
+        atualizarDicaItem();
     } catch (erro) {
         mostrarMensagem(erro.message, "erro");
     }
@@ -760,9 +748,20 @@ document.getElementById("busca").addEventListener("input", () => {
 });
 
 const campoBuscaItem = document.getElementById("busca-item");
+const selectMaterial = document.getElementById("select-material");
 
+// Digitou o código: escolhe o item na caixa
 campoBuscaItem.addEventListener("input", () => {
-    selecionarItem(encontrarItem(campoBuscaItem.value));
+    const material = encontrarPorCodigo(campoBuscaItem.value);
+    selectMaterial.value = material ? material.id : "";
+    aoMudarItem();
+});
+
+// Escolheu na caixa: mostra o código do item no campo
+selectMaterial.addEventListener("change", () => {
+    const material = itemSelecionado();
+    campoBuscaItem.value = material?.codigo ?? "";
+    aoMudarItem();
 });
 
 // O leitor de código de barras "digita" o código e aperta Enter; sem isso o formulário seria enviado
@@ -771,10 +770,7 @@ campoBuscaItem.addEventListener("keydown", (evento) => {
         return;
     }
     evento.preventDefault();
-    const material = encontrarItem(campoBuscaItem.value);
-    selecionarItem(material);
-    if (material) {
-        campoBuscaItem.value = textoDoItem(material);
+    if (itemSelecionado()) {
         document.querySelector("#form-movimentacao [name=quantidade]").focus();
     }
 });

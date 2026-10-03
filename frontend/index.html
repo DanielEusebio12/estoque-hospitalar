@@ -90,15 +90,16 @@
                         <!-- Preenchido pela aba escolhida (Saída ou Entrada) -->
                         <input type="hidden" name="tipo" id="campo-tipo" value="saida">
 
-                        <!-- Digita o código (ou usa o leitor de código de barras) ou começa a digitar o nome -->
-                        <label>Código ou nome do item
-                            <input id="busca-item" class="campo-busca" list="sugestoes-itens" autocomplete="off"
-                                   placeholder="Ex.: 1221 ou Dipirona" autofocus>
-                            <span id="item-encontrado" class="dica"></span>
-                        </label>
-                        <datalist id="sugestoes-itens"></datalist>
-                        <!-- O que vai para a API é o id; a busca acima só serve para encontrá-lo -->
-                        <input type="hidden" name="material_id" id="material-id">
+                        <!-- Código e caixa ficam sincronizados: digitar o código escolhe na caixa e vice-versa -->
+                        <div class="linha-campos linha-codigo">
+                            <label>Código
+                                <input id="busca-item" autocomplete="off" placeholder="Ex.: 1221" autofocus>
+                            </label>
+                            <label>Item
+                                <select name="material_id" id="select-material" required></select>
+                            </label>
+                        </div>
+                        <span id="item-encontrado" class="dica"></span>
 
                         <div class="linha-campos">
                             <label>Quantidade <input name="quantidade" type="number" min="1" required placeholder="0"></label>
