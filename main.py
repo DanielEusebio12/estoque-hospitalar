@@ -207,6 +207,19 @@ def calcular_validades(conn, material_id: int) -> list[dict]:
     return [descrever_validade(item, hoje) for item in distribuir_fefo(movimentacoes)]
 
 
+def calcular_validades_de_todos(conn) -> dict[int, list[dict]]:
+    """Validades em estoque de cada item, com uma consulta só em vez de uma por item."""
+    movimentacoes = conn.execute(SQL_MOVIMENTACOES_EM_ORDEM.format(filtro="")).fetchall()
+    por_material = {}
+    for mov in movimentacoes:
+        por_material.setdefault(mov["material_id"], []).append(mov)
+    hoje = date.today()
+    return {
+        material_id: [descrever_validade(item, hoje) for item in distribuir_fefo(lista)]
+        for material_id, lista in por_material.items()
+    }
+
+
 def verificar_permissao(usuario: dict, tipo: str, categoria: str):
     if usuario["perfil"] == "super_admin" or usuario["cargo"] == "Farmacêutico":
         return
@@ -378,7 +391,20 @@ def listar_materiais(
     sql += " GROUP BY m.id ORDER BY m.nome"
     with conectar() as conn:
         linhas = conn.execute(sql, parametros).fetchall()
-    return [dict(linha) for linha in linhas]
+        validades_por_material = calcular_validades_de_todos(conn)
+    resultado = []
+    for linha in linhas:
+        # A primeira validade da lista FEFO é a que vence antes (e a que deve sair primeiro)
+        com_data = [v for v in validades_por_material.get(linha["id"], []) if v["validade"]]
+        proxima = com_data[0] if com_data else None
+        resultado.append(
+            {
+                **dict(linha),
+                "proxima_validade": proxima["validade"] if proxima else None,
+                "dias_para_vencer": proxima["dias_restantes"] if proxima else None,
+            }
+        )
+    return resultado
 
 
 @app.get("/materiais/{material_id}")
@@ -428,21 +454,14 @@ def alertas_vencimento(
             linha["id"]: linha
             for linha in conn.execute("SELECT id, nome, unidade FROM materiais WHERE ativo = 1")
         }
-        movimentacoes = conn.execute(SQL_MOVIMENTACOES_EM_ORDEM.format(filtro="")).fetchall()
+        validades_por_material = calcular_validades_de_todos(conn)
 
-    # Uma consulta para todos os itens em vez de uma por item; o FEFO é feito aqui em Python
-    por_material = {}
-    for mov in movimentacoes:
-        por_material.setdefault(mov["material_id"], []).append(mov)
-
-    hoje = date.today()
     alertas = []
-    for material_id, lista in por_material.items():
+    for material_id, validades in validades_por_material.items():
         material = materiais.get(material_id)
         if material is None:  # item desativado
             continue
-        for item in distribuir_fefo(lista):
-            validade = descrever_validade(item, hoje)
+        for validade in validades:
             if validade["dias_restantes"] is not None and validade["dias_restantes"] <= dias:
                 alertas.append(
                     {

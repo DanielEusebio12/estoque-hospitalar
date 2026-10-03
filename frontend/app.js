@@ -132,6 +132,28 @@ function combinaComSituacao(material, situacao) {
     }
 }
 
+// Data da validade que vence primeiro; embaixo, o prazo quando ele merece atenção
+function criarCelulaValidade(material) {
+    const celula = document.createElement("td");
+    if (!material.controla_validade) {
+        celula.appendChild(criarElemento("span", "Sem validade", "texto-suave"));
+        return celula;
+    }
+    if (!material.proxima_validade) {
+        celula.appendChild(criarElemento("span", "—", "texto-suave"));
+        return celula;
+    }
+    celula.appendChild(criarElemento("span", formatarValidade(material.proxima_validade)));
+    const dias = material.dias_para_vencer;
+    if (dias < 0) {
+        celula.appendChild(criarElemento("small", `vencido há ${-dias} dia${dias === -1 ? "" : "s"}`, "prazo vencido"));
+    } else if (dias <= DIAS_ALERTA_VENCIMENTO) {
+        const texto = dias === 0 ? "vence hoje" : `vence em ${dias} dia${dias === 1 ? "" : "s"}`;
+        celula.appendChild(criarElemento("small", texto, "prazo perto"));
+    }
+    return celula;
+}
+
 async function carregarMateriais() {
     const parametros = new URLSearchParams();
     const busca = document.getElementById("busca").value.trim();
@@ -157,7 +179,7 @@ async function carregarMateriais() {
             mensagem = "Nenhum item encontrado.";
         }
         const celula = criarElemento("td", mensagem, "vazio");
-        celula.colSpan = ehAdmin() ? 8 : 7;
+        celula.colSpan = ehAdmin() ? 9 : 8;
         const linha = document.createElement("tr");
         linha.appendChild(celula);
         tabela.appendChild(linha);
@@ -171,6 +193,7 @@ async function carregarMateriais() {
         linha.appendChild(criarElemento("td", material.unidade));
         linha.appendChild(criarElemento("td", material.estoque_minimo, "numero"));
         linha.appendChild(criarElemento("td", material.saldo, "numero"));
+        linha.appendChild(criarCelulaValidade(material));
         const celulaSituacao = document.createElement("td");
         celulaSituacao.appendChild(criarEtiqueta(material));
         linha.appendChild(celulaSituacao);
@@ -218,7 +241,12 @@ function atualizarDicaItem() {
     const material = itemSelecionado();
     const codigoDigitado = document.getElementById("busca-item").value.trim();
     if (material) {
-        dica.textContent = `✓ ${material.nome} · saldo ${material.saldo} ${material.unidade}`;
+        let validade = "";
+        if (material.proxima_validade) {
+            const verbo = material.dias_para_vencer < 0 ? "venceu" : "vence";
+            validade = ` · ${verbo} em ${formatarValidade(material.proxima_validade)}`;
+        }
+        dica.textContent = `✓ ${material.nome} · saldo ${material.saldo} ${material.unidade}${validade}`;
         dica.className = "dica ok";
     } else if (codigoDigitado) {
         dica.textContent = "Nenhum item com esse código.";

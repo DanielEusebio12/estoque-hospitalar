@@ -782,6 +782,21 @@ tr.inativo td:not(:last-child) {
     flex-wrap: nowrap;
 }
 
+/* Prazo embaixo da data de validade na tabela de estoque */
+.prazo {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.prazo.perto {
+    color: var(--alerta);
+}
+
+.prazo.vencido {
+    color: var(--perigo);
+}
+
 .numero {
     text-align: right;
     font-variant-numeric: tabular-nums;

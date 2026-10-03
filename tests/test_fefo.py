@@ -53,6 +53,24 @@ def test_alerta_de_vencimento_mostra_o_que_vence_em_30_dias(admin, criar_item):
     assert [(a["validade"], a["dias_restantes"]) for a in alertas] == [(perto, 10)]
 
 
+def test_estoque_mostra_a_proxima_validade_de_cada_item(admin, criar_item):
+    remedio = criar_item("Dipirona")
+    vassoura = criar_item("Vassoura", "Material de limpeza", controla_validade=False)
+    perto = (date.today() + timedelta(days=10)).isoformat()
+    for validade, quantidade in (("2099-01-01", 5), (perto, 3)):
+        admin.post("/movimentacoes", json={"material_id": remedio, "tipo": "entrada", "quantidade": quantidade, "validade": validade})
+    admin.post("/movimentacoes", json={"material_id": vassoura, "tipo": "entrada", "quantidade": 2})
+
+    itens = {item["nome"]: item for item in admin.get("/materiais").json()}
+    assert (itens["Dipirona"]["proxima_validade"], itens["Dipirona"]["dias_para_vencer"]) == (perto, 10)
+    assert itens["Vassoura"]["proxima_validade"] is None
+
+    # Depois que o lote mais próximo sai (FEFO), a próxima validade passa a ser a seguinte
+    admin.post("/movimentacoes", json={"material_id": remedio, "tipo": "saida", "quantidade": 3, "setor": "Pediatria"})
+    itens = {item["nome"]: item for item in admin.get("/materiais").json()}
+    assert itens["Dipirona"]["proxima_validade"] == "2099-01-01"
+
+
 def test_entrada_ja_vencida_e_recusada(admin, criar_item):
     item = criar_item("Dipirona")
     ontem = (date.today() - timedelta(days=1)).isoformat()
