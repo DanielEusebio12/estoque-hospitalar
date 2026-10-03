@@ -16,6 +16,9 @@ services:
       # O disco do plano gratuito é apagado a cada reinício; o sistema se preenche com dados de exemplo
       - key: DADOS_DEMO
         value: "1"
+      # O servidor do Render roda em UTC; sem isso as movimentações ficariam 3 horas adiantadas
+      - key: TZ
+        value: America/Sao_Paulo
       # O site tem HTTPS, então o cookie de sessão só trafega criptografado
       - key: COOKIE_SEGURO
         value: "1"

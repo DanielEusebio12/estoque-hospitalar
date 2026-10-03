@@ -56,6 +56,7 @@ O arquivo [`render.yaml`](render.yaml) descreve o site de demonstração no [Ren
 | `SENHA_ADMIN_INICIAL` | Senha do `daniel.eusebio` (e dos colaboradores de exemplo). No site publicado substitui a senha padrão, que é pública neste README |
 | `DADOS_DEMO=1` | Preenche um banco vazio com itens, colaboradores e 30 dias de movimentações, seguindo as mesmas regras da API |
 | `COOKIE_SEGURO=1` | Cookie de sessão só por HTTPS |
+| `TZ=America/Sao_Paulo` | Grava as movimentações no horário de Brasília (o servidor roda em UTC) |
 | `ESTOQUE_BANCO` | Caminho do arquivo do banco (padrão: `estoque.db`) |
 
 No plano gratuito o disco é apagado a cada reinício, então o site volta sempre aos dados de exemplo. Colaboradores de exemplo: `humberto.amigo` (admin, farmacêutico), `beatriz.rocha` (farmacêutica), `ana.lima` (enfermeira), `carlos.souza` (técnico de enfermagem) e `joana.pereira` (auxiliar de limpeza).
