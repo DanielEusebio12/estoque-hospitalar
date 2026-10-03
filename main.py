@@ -133,20 +133,34 @@ DIAS_ALERTA_VENCIMENTO = 30
 SETOR_DESCARTE = "Descarte"
 
 
-def distribuir_fefo(entradas: list, total_saidas: int) -> list[dict]:
-    """Quanto sobra de cada validade, supondo que as saídas consumiram primeiro o que vence primeiro.
+def ordem_fefo(validade: str | None) -> tuple:
+    # Sem validade vai para o fim: nunca vence, então é a última a sair
+    return (validade is None, validade or "")
 
-    `entradas` precisa vir ordenada da validade mais próxima para a mais distante.
+
+def distribuir_fefo(movimentacoes: list) -> list[dict]:
+    """Quanto sobra de cada validade, supondo que cada saída levou primeiro o que vencia primeiro.
+
+    `movimentacoes` precisa vir em ordem de registro: uma saída só pode consumir
+    o que já tinha entrado até aquele momento.
     """
-    a_descontar = total_saidas
-    validades = []
-    for entrada in entradas:
-        consumido = min(entrada["quantidade"], a_descontar)
-        a_descontar -= consumido
-        restante = entrada["quantidade"] - consumido
-        if restante > 0:
-            validades.append({"validade": entrada["validade"], "quantidade": restante})
-    return validades
+    estoque = {}  # validade -> quantidade disponível
+    for mov in movimentacoes:
+        if mov["tipo"] == "entrada":
+            estoque[mov["validade"]] = estoque.get(mov["validade"], 0) + mov["quantidade"]
+            continue
+        a_descontar = mov["quantidade"]
+        for validade in sorted(estoque, key=ordem_fefo):
+            consumido = min(estoque[validade], a_descontar)
+            estoque[validade] -= consumido
+            a_descontar -= consumido
+            if a_descontar == 0:
+                break
+    return [
+        {"validade": validade, "quantidade": quantidade}
+        for validade, quantidade in sorted(estoque.items(), key=lambda item: ordem_fefo(item[0]))
+        if quantidade > 0
+    ]
 
 
 def descrever_validade(item: dict, hoje: date) -> dict:
@@ -154,25 +168,19 @@ def descrever_validade(item: dict, hoje: date) -> dict:
     return {**item, "dias_restantes": dias, "vencido": dias is not None and dias < 0}
 
 
-# "validade IS NULL" no ORDER BY joga entradas sem validade para o fim, já que não vencem
-SQL_ENTRADAS_POR_VALIDADE = (
-    "SELECT material_id, validade, SUM(quantidade) AS quantidade FROM movimentacoes "
-    "WHERE tipo = 'entrada' {filtro} "
-    "GROUP BY material_id, validade ORDER BY material_id, validade IS NULL, validade"
+# Ordem do id = ordem em que foram registradas
+SQL_MOVIMENTACOES_EM_ORDEM = (
+    "SELECT material_id, tipo, quantidade, validade FROM movimentacoes {filtro} "
+    "ORDER BY material_id, id"
 )
 
 
 def calcular_validades(conn, material_id: int) -> list[dict]:
-    entradas = conn.execute(
-        SQL_ENTRADAS_POR_VALIDADE.format(filtro="AND material_id = ?"), (material_id,)
+    movimentacoes = conn.execute(
+        SQL_MOVIMENTACOES_EM_ORDEM.format(filtro="WHERE material_id = ?"), (material_id,)
     ).fetchall()
-    total_saidas = conn.execute(
-        "SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes "
-        "WHERE material_id = ? AND tipo = 'saida'",
-        (material_id,),
-    ).fetchone()[0]
     hoje = date.today()
-    return [descrever_validade(item, hoje) for item in distribuir_fefo(entradas, total_saidas)]
+    return [descrever_validade(item, hoje) for item in distribuir_fefo(movimentacoes)]
 
 
 def verificar_permissao(usuario: dict, tipo: str, categoria: str):
@@ -379,26 +387,20 @@ def alertas_vencimento(
             linha["id"]: linha
             for linha in conn.execute("SELECT id, nome, unidade FROM materiais WHERE ativo = 1")
         }
-        entradas = conn.execute(SQL_ENTRADAS_POR_VALIDADE.format(filtro="")).fetchall()
-        saidas = dict(
-            conn.execute(
-                "SELECT material_id, SUM(quantidade) FROM movimentacoes "
-                "WHERE tipo = 'saida' GROUP BY material_id"
-            ).fetchall()
-        )
+        movimentacoes = conn.execute(SQL_MOVIMENTACOES_EM_ORDEM.format(filtro="")).fetchall()
 
     # Uma consulta para todos os itens em vez de uma por item; o FEFO é feito aqui em Python
-    entradas_por_material = {}
-    for entrada in entradas:
-        entradas_por_material.setdefault(entrada["material_id"], []).append(entrada)
+    por_material = {}
+    for mov in movimentacoes:
+        por_material.setdefault(mov["material_id"], []).append(mov)
 
     hoje = date.today()
     alertas = []
-    for material_id, lista in entradas_por_material.items():
+    for material_id, lista in por_material.items():
         material = materiais.get(material_id)
         if material is None:  # item desativado
             continue
-        for item in distribuir_fefo(lista, saidas.get(material_id, 0)):
+        for item in distribuir_fefo(lista):
             validade = descrever_validade(item, hoje)
             if validade["dias_restantes"] is not None and validade["dias_restantes"] <= dias:
                 alertas.append(
