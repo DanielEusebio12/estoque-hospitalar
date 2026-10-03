@@ -708,6 +708,7 @@ async function iniciar() {
     if (usuarioAtual.perfil === "super_admin" || usuarioAtual.cargo === "Farmacêutico") {
         document.querySelectorAll(".so-entrada").forEach((elemento) => (elemento.hidden = false));
     }
+    abrirAba(document.querySelector(".aba:not([hidden])"));
     document.getElementById("aviso-historico").textContent = ehAdmin()
         ? "Todas as movimentações, das mais recentes para as mais antigas."
         : "Suas movimentações, das mais recentes para as mais antigas.";

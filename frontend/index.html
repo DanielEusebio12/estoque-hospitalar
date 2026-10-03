@@ -74,8 +74,9 @@
             <section class="cartao">
                 <nav class="abas">
                     <!-- Saída e Entrada usam o mesmo formulário; data-tipo diz qual movimentação a aba registra -->
-                    <button type="button" class="aba ativa" data-aba="aba-movimentacao" data-tipo="saida">Saída</button>
+                    <!-- A aba inicial é a primeira visível (definida no app.js), já que Entrada pode estar escondida -->
                     <button type="button" class="aba so-entrada" data-aba="aba-movimentacao" data-tipo="entrada" hidden>Entrada</button>
+                    <button type="button" class="aba ativa" data-aba="aba-movimentacao" data-tipo="saida">Saída</button>
                     <!-- data-sem-alertas: a aba esconde o cartão de alertas -->
                     <button type="button" class="aba" data-aba="aba-estoque" data-sem-alertas>Estoque</button>
                     <button type="button" class="aba" data-aba="aba-historico" data-sem-alertas>Histórico</button>
