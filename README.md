@@ -4,6 +4,10 @@ Sistema web para controlar o estoque da farmácia de um hospital: entrada e saí
 
 Feito com **Python + FastAPI + SQLite** no back-end e **HTML, CSS e JavaScript puro** no front-end, sem frameworks nem bibliotecas de gráficos.
 
+**Demonstração online:** https://estoque-hospitalar-nwqw.onrender.com
+
+O site de demonstração roda no plano gratuito do Render: depois de um tempo sem uso ele "dorme" e o primeiro acesso pode levar cerca de 1 minuto. O acesso é restrito; peça as credenciais de demonstração.
+
 ## Funcionalidades
 
 - **Entrada e saída de itens**: busca pelo código (pensada para leitor de código de barras) ou pela lista de itens, com validade na entrada e setor de destino na saída.
