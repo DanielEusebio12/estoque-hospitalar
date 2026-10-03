@@ -457,6 +457,10 @@ function calcularNivel(material) {
 async function atualizarPainelItem() {
     const material = itemSelecionado();
     document.getElementById("painel-vazio").hidden = Boolean(material);
+    // Sem item escolhido não quer dizer sem itens cadastrados; a mensagem diferencia os dois casos
+    document.getElementById("painel-vazio-texto").textContent = materiaisAtivos.length
+        ? "Digite o código ou escolha um item para ver o saldo, as validades e as últimas movimentações."
+        : "Nenhum item cadastrado ainda. Cadastre um item para começar.";
     document.getElementById("painel-conteudo").hidden = !material;
     if (!material) {
         return;
