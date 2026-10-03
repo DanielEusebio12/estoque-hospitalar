@@ -389,6 +389,51 @@ form label {
     font-weight: 500;
 }
 
+/* Checkbox ao lado do texto (os inputs normais ocupam a linha toda) */
+.campo-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.campo-checkbox input {
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    flex-shrink: 0;
+    accent-color: var(--primaria);
+    cursor: pointer;
+}
+
+.campo-checkbox input:disabled + span {
+    color: var(--texto-suave);
+    cursor: not-allowed;
+}
+
+.campo-checkbox small {
+    display: block;
+    margin-top: 2px;
+    color: var(--texto-suave);
+    font-weight: 400;
+    font-size: 0.8rem;
+}
+
+/* Ocupa o lugar do campo de validade, alinhado com a caixa de quantidade */
+.aviso-campo {
+    align-self: end;
+    margin-bottom: 14px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: var(--raio-pequeno);
+    background: var(--superficie-suave);
+    border: 1px dashed var(--borda);
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+}
+
 .linha-campos {
     display: grid;
     grid-template-columns: 1fr 1fr;

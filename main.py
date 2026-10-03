@@ -49,11 +49,22 @@ PERMISSOES_SAIDA = {
 }
 
 
+# Itens de uso no paciente sempre têm validade; o "sem validade" é para pano, vassoura, rodo...
+CATEGORIAS_COM_VALIDADE_OBRIGATORIA = {"Medicamento", "Soro e solução"}
+
+
 class MaterialEntrada(BaseModel):
     nome: str = Field(min_length=2)
     categoria: Categoria
     unidade: str = Field(min_length=1)
     estoque_minimo: int = Field(default=0, ge=0)
+    controla_validade: bool = True
+
+    @model_validator(mode="after")
+    def validar_validade_obrigatoria(self):
+        if not self.controla_validade and self.categoria in CATEGORIAS_COM_VALIDADE_OBRIGATORIA:
+            raise ValueError(f"{self.categoria} precisa ter controle de validade")
+        return self
 
 
 class ColaboradorEntrada(BaseModel):
@@ -88,10 +99,8 @@ class MovimentacaoEntrada(BaseModel):
 
     @model_validator(mode="after")
     def validar_campos_por_tipo(self):
-        # Entrada precisa da validade para controle de vencimento; saída precisa do setor de destino
-        if self.tipo == "entrada" and not self.validade:
-            raise ValueError("Entrada exige a validade")
-        if self.tipo == "entrada" and self.validade < date.today():
+        # Se a entrada exige validade depende do item, então isso é conferido no endpoint
+        if self.tipo == "entrada" and self.validade and self.validade < date.today():
             raise ValueError("Não é possível dar entrada em item já vencido")
         if self.tipo == "saida" and not self.setor:
             raise ValueError("Saída exige o setor de destino")
@@ -244,9 +253,15 @@ def criar_material(material: MaterialEntrada, usuario: dict = Depends(exigir_adm
     try:
         with conectar() as conn:
             cursor = conn.execute(
-                "INSERT INTO materiais (nome, categoria, unidade, estoque_minimo) "
-                "VALUES (?, ?, ?, ?)",
-                (material.nome, material.categoria, material.unidade, material.estoque_minimo),
+                "INSERT INTO materiais (nome, categoria, unidade, estoque_minimo, controla_validade) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    material.nome,
+                    material.categoria,
+                    material.unidade,
+                    material.estoque_minimo,
+                    int(material.controla_validade),
+                ),
             )
             novo_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -272,9 +287,16 @@ def editar_material(
                     detail="Não é possível mudar a unidade de um item que já tem movimentações",
                 )
             conn.execute(
-                "UPDATE materiais SET nome = ?, categoria = ?, unidade = ?, estoque_minimo = ? "
-                "WHERE id = ?",
-                (material.nome, material.categoria, material.unidade, material.estoque_minimo, material_id),
+                "UPDATE materiais SET nome = ?, categoria = ?, unidade = ?, estoque_minimo = ?, "
+                "controla_validade = ? WHERE id = ?",
+                (
+                    material.nome,
+                    material.categoria,
+                    material.unidade,
+                    material.estoque_minimo,
+                    int(material.controla_validade),
+                    material_id,
+                ),
             )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Já existe um material com esse nome")
@@ -575,14 +597,14 @@ def listar_movimentacoes(
     return [dict(linha) for linha in linhas]
 
 
-
 @app.post("/movimentacoes", status_code=201)
 def registrar_movimentacao(mov: MovimentacaoEntrada, usuario: dict = Depends(usuario_logado)):
     with conectar() as conn:
         # Trava a escrita já no início para duas saídas simultâneas não deixarem o saldo negativo
         conn.execute("BEGIN IMMEDIATE")
         material = conn.execute(
-            "SELECT categoria, unidade, ativo FROM materiais WHERE id = ?", (mov.material_id,)
+            "SELECT categoria, unidade, ativo, controla_validade FROM materiais WHERE id = ?",
+            (mov.material_id,),
         ).fetchone()
         if material is None:
             raise HTTPException(status_code=404, detail="Material não encontrado")
@@ -591,6 +613,13 @@ def registrar_movimentacao(mov: MovimentacaoEntrada, usuario: dict = Depends(usu
 
         # O responsável vem da sessão, e não do formulário, para ninguém registrar em nome de outro
         verificar_permissao(usuario, mov.tipo, material["categoria"])
+
+        if mov.tipo == "entrada":
+            if not material["controla_validade"]:
+                # Item sem validade (pano, vassoura...): ignora data enviada por engano
+                mov.validade = None
+            elif not mov.validade:
+                raise HTTPException(status_code=422, detail="Entrada exige a validade")
 
         if mov.tipo == "saida" and mov.setor != SETOR_DESCARTE:
             # Pelo FEFO, a saída consumiria as unidades vencidas como se fossem para um paciente

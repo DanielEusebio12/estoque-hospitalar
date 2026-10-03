@@ -99,6 +99,9 @@
                             <div id="campos-entrada">
                                 <label>Validade <input name="validade" type="date"></label>
                             </div>
+                            <div id="aviso-sem-validade" class="aviso-campo" hidden>
+                                Este item não tem validade.
+                            </div>
                             <div id="campos-saida" hidden>
                                 <label>Setor
                                     <select name="setor">
@@ -198,6 +201,14 @@
                         </div>
 
                         <label>Estoque mínimo <input name="estoque_minimo" type="number" min="0" value="0"></label>
+
+                        <label class="campo-checkbox">
+                            <input type="checkbox" name="sem_validade" id="sem-validade">
+                            <span>
+                                Este item não tem validade
+                                <small id="dica-sem-validade">Ex.: pano, bucha, rodo, vassoura. A entrada não vai pedir data.</small>
+                            </span>
+                        </label>
 
                         <button type="submit" id="botao-salvar-material" class="botao-principal">Cadastrar</button>
                     </form>

@@ -507,7 +507,8 @@ async function atualizarTela() {
     }
     try {
         await Promise.all(carregamentos);
-        // Depois das listas, porque o painel usa o saldo que acabou de ser carregado
+        // Depois das listas, porque o painel e os campos usam os itens que acabaram de ser carregados
+        atualizarCamposMovimentacao();
         await atualizarPainelItem();
     } catch (erro) {
         mostrarMensagem("Erro ao carregar dados: " + erro.message, "erro");
@@ -528,6 +529,8 @@ function iniciarEdicaoMaterial(material) {
     for (const campo of ["nome", "categoria", "unidade", "estoque_minimo"]) {
         form.elements[campo].value = material[campo];
     }
+    form.elements.sem_validade.checked = !material.controla_validade;
+    atualizarCheckboxValidade();
     document.getElementById("material-em-edicao").textContent = material.nome;
     document.getElementById("aviso-edicao-material").hidden = false;
     document.getElementById("botao-salvar-material").textContent = "Salvar alterações";
@@ -540,14 +543,38 @@ function cancelarEdicaoMaterial() {
     document.getElementById("form-material").reset();
     document.getElementById("aviso-edicao-material").hidden = true;
     document.getElementById("botao-salvar-material").textContent = "Cadastrar";
+    atualizarCheckboxValidade();
 }
 
 document.getElementById("cancelar-edicao-material").addEventListener("click", cancelarEdicaoMaterial);
+
+// Espelha CATEGORIAS_COM_VALIDADE_OBRIGATORIA da API
+const CATEGORIAS_COM_VALIDADE_OBRIGATORIA = ["Medicamento", "Soro e solução"];
+const DICA_SEM_VALIDADE = "Ex.: pano, bucha, rodo, vassoura. A entrada não vai pedir data.";
+
+function atualizarCheckboxValidade() {
+    const form = document.getElementById("form-material");
+    const categoria = form.elements.categoria.value;
+    const obrigatoria = CATEGORIAS_COM_VALIDADE_OBRIGATORIA.includes(categoria);
+    const checkbox = form.elements.sem_validade;
+    checkbox.disabled = obrigatoria;
+    if (obrigatoria) {
+        checkbox.checked = false;
+    }
+    document.getElementById("dica-sem-validade").textContent = obrigatoria
+        ? `${categoria} sempre precisa ter validade.`
+        : DICA_SEM_VALIDADE;
+}
+
+document.getElementById("form-material").elements.categoria.addEventListener("change", atualizarCheckboxValidade);
 
 document.getElementById("form-material").addEventListener("submit", async (evento) => {
     evento.preventDefault();
     const dados = Object.fromEntries(new FormData(evento.target));
     dados.estoque_minimo = Number(dados.estoque_minimo);
+    // Checkbox marcado só aparece no FormData como "on"; a API espera o booleano controla_validade
+    dados.controla_validade = !evento.target.elements.sem_validade.checked;
+    delete dados.sem_validade;
     const editando = materialEmEdicao !== null;
     try {
         const material = await chamarApi(
@@ -658,11 +685,22 @@ document.querySelectorAll(".aba").forEach((botao) => {
 
 // Mostra validade na entrada e setor na saída
 function definirTipo(tipo) {
-    const ehEntrada = tipo === "entrada";
     document.getElementById("campo-tipo").value = tipo;
-    document.getElementById("campos-entrada").hidden = !ehEntrada;
+    document.getElementById("botao-registrar").textContent =
+        tipo === "entrada" ? "Registrar entrada" : "Registrar saída";
+    atualizarCamposMovimentacao();
+}
+
+// Os campos dependem do tipo e também do item: item sem validade não pede data na entrada
+function atualizarCamposMovimentacao() {
+    const ehEntrada = document.getElementById("campo-tipo").value === "entrada";
+    const id = Number(document.getElementById("select-material").value);
+    const material = materiaisAtivos.find((item) => item.id === id);
+    const semValidade = Boolean(material) && !material.controla_validade;
+
     document.getElementById("campos-saida").hidden = ehEntrada;
-    document.getElementById("botao-registrar").textContent = ehEntrada ? "Registrar entrada" : "Registrar saída";
+    document.getElementById("campos-entrada").hidden = !ehEntrada || semValidade;
+    document.getElementById("aviso-sem-validade").hidden = !(ehEntrada && semValidade);
 }
 
 definirTipo("saida");
@@ -672,6 +710,7 @@ document.getElementById("busca").addEventListener("input", () => {
 });
 
 document.getElementById("select-material").addEventListener("change", () => {
+    atualizarCamposMovimentacao();
     atualizarPainelItem().catch((erro) => mostrarMensagem(erro.message, "erro"));
 });
 
