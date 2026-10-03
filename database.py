@@ -1,6 +1,8 @@
+import os
 import sqlite3
 
-NOME_BANCO = "estoque.db"
+# Variável de ambiente permite apontar para outro arquivo (os testes usam um banco temporário)
+NOME_BANCO = os.environ.get("ESTOQUE_BANCO", "estoque.db")
 
 
 def conectar():
