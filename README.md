@@ -43,6 +43,19 @@ Abra **http://localhost:8000**. O banco (`estoque.db`) é criado automaticamente
 
 A documentação interativa da API fica em **http://localhost:8000/docs**.
 
+## Versão publicada (Render)
+
+O arquivo [`render.yaml`](render.yaml) descreve o site de demonstração no [Render](https://render.com). Ele usa estas variáveis de ambiente:
+
+| Variável | Para que serve |
+|---|---|
+| `SENHA_ADMIN_INICIAL` | Senha do `daniel.eusebio` (e dos colaboradores de exemplo). No site publicado substitui a senha padrão, que é pública neste README |
+| `DADOS_DEMO=1` | Preenche um banco vazio com itens, colaboradores e 30 dias de movimentações, seguindo as mesmas regras da API |
+| `COOKIE_SEGURO=1` | Cookie de sessão só por HTTPS |
+| `ESTOQUE_BANCO` | Caminho do arquivo do banco (padrão: `estoque.db`) |
+
+No plano gratuito o disco é apagado a cada reinício, então o site volta sempre aos dados de exemplo. Colaboradores de exemplo: `humberto.amigo` (admin, farmacêutico), `beatriz.rocha` (farmacêutica), `ana.lima` (enfermeira), `carlos.souza` (técnico de enfermagem) e `joana.pereira` (auxiliar de limpeza).
+
 ## Perfis e permissões
 
 | Perfil | O que pode |
@@ -85,7 +98,7 @@ A tela esconde o que a pessoa não pode usar, mas quem garante a regra é a API:
 pytest
 ```
 
-São 36 testes cobrindo autenticação, permissões, regras de estoque, painel e o cálculo de validades. Cada teste roda num banco temporário próprio, então o `estoque.db` nunca é alterado.
+São 40 testes cobrindo autenticação, permissões, regras de estoque, painel, cálculo de validades e a configuração do site publicado. Cada teste roda num banco temporário próprio, então o `estoque.db` nunca é alterado.
 
 Um deles é um teste de regressão: uma primeira versão do cálculo de validades descontava as saídas de lotes que ainda nem tinham entrado, e o alerta de vencimento deixava de aparecer. O erro foi encontrado testando com dados reais, corrigido, e o teste garante que ele não volte.
 

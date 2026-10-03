@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import os
 import secrets
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
@@ -56,11 +57,20 @@ def criar_super_admin_inicial():
         ).fetchone()
         if existe:
             return
+        # No site publicado a senha vem do ambiente: a padrão está no README e qualquer um a conhece
+        senha_ambiente = os.environ.get("SENHA_ADMIN_INICIAL")
         conn.execute(
             "INSERT INTO colaboradores "
             "(nome, matricula, cargo, usuario, senha_hash, perfil, trocar_senha) "
-            "VALUES (?, ?, ?, ?, ?, 'super_admin', 1)",
-            ("Daniel Eusebio", "ADM-0001", "Administrador", "daniel.eusebio", gerar_hash_senha(SENHA_PADRAO)),
+            "VALUES (?, ?, ?, ?, ?, 'super_admin', ?)",
+            (
+                "Daniel Eusebio",
+                "ADM-0001",
+                "Administrador",
+                "daniel.eusebio",
+                gerar_hash_senha(senha_ambiente or SENHA_PADRAO),
+                0 if senha_ambiente else 1,
+            ),
         )
 
 
@@ -121,12 +131,14 @@ def login(dados: LoginEntrada, response: Response):
             (hash_token(token), usuario["id"], f"+{DURACAO_SESSAO_HORAS} hours"),
         )
 
-    # httponly: o JavaScript não lê o cookie; samesite: outro site não consegue usá-lo
+    # httponly: o JavaScript não lê o cookie; samesite: outro site não consegue usá-lo;
+    # secure (só no site publicado, que tem HTTPS): o cookie nunca trafega sem criptografia
     response.set_cookie(
         NOME_COOKIE,
         token,
         httponly=True,
         samesite="strict",
+        secure=os.environ.get("COOKIE_SEGURO") == "1",
         max_age=DURACAO_SESSAO_HORAS * 3600,
     )
     return dados_publicos(usuario)

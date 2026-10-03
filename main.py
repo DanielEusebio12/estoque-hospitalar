@@ -5,6 +5,7 @@
 # @app.get("/")
 # def raiz():
 #     return {"mensagem": "Estoque funcionando"}
+import os
 import re
 import sqlite3
 from datetime import date, timedelta
@@ -17,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 import auth
+import dados_demo
 from auth import PERFIS_ADMIN, exigir_admin, usuario_autenticado, usuario_logado
 from database import conectar, criar_tabelas
 
@@ -29,6 +31,9 @@ app.include_router(auth.router)
 
 criar_tabelas()
 auth.criar_super_admin_inicial()
+# Site de demonstração: o disco é apagado a cada reinício, então ele se preenche sozinho
+if os.environ.get("DADOS_DEMO") == "1":
+    dados_demo.popular_se_vazio()
 
 
 # Lista fechada porque as permissões dependem do nome exato da categoria

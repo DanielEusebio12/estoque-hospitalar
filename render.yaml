@@ -1,0 +1,24 @@
+# Configuração do site de demonstração no Render (render.com).
+# O Render lê este arquivo ao criar o serviço pelo "Blueprint".
+services:
+  - type: web
+    name: estoque-hospitalar
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # O Render escolhe a porta e informa pela variável PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /login
+    envVars:
+      # Mesma versão usada no desenvolvimento, em que o requirements.txt foi testado
+      - key: PYTHON_VERSION
+        value: 3.14.4
+      # O disco do plano gratuito é apagado a cada reinício; o sistema se preenche com dados de exemplo
+      - key: DADOS_DEMO
+        value: "1"
+      # O site tem HTTPS, então o cookie de sessão só trafega criptografado
+      - key: COOKIE_SEGURO
+        value: "1"
+      # Senha do daniel.eusebio e dos colaboradores de exemplo; o Render pede o valor ao criar o serviço
+      - key: SENHA_ADMIN_INICIAL
+        sync: false
