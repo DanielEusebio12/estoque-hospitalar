@@ -13,24 +13,26 @@ from datetime import date, timedelta
 import auth
 from database import conectar
 
+# Códigos só com números, agrupados pelo primeiro dígito: 1-5 medicamentos, 6 soros,
+# 7 materiais hospitalares, 8 antissépticos, 9 limpeza
 # (código, nome, categoria, unidade, mínimo, tem validade, estoque inicial, maior saída, peso no sorteio)
 ITENS = [
-    ("MED-1221", "Dipirona 500mg", "Medicamento", "comprimido", 200, True, 900, 30, 10),
-    ("MED-1305", "Paracetamol 750mg", "Medicamento", "comprimido", 150, True, 700, 24, 8),
-    ("MED-2040", "Amoxicilina 500mg", "Medicamento", "cápsula", 100, True, 300, 21, 5),
-    ("MED-3110", "Omeprazol 20mg", "Medicamento", "cápsula", 80, True, 350, 14, 4),
-    ("MED-4502", "Insulina NPH", "Medicamento", "frasco-ampola", 30, True, 70, 3, 3),
-    ("MED-5120", "Dipirona injetável", "Medicamento", "ampola", 60, True, 160, 6, 2),
-    ("SOR-0100", "Soro fisiológico 0,9% 500ml", "Soro e solução", "bolsa", 120, True, 400, 12, 7),
-    ("SOR-0200", "Soro glicosado 5% 500ml", "Soro e solução", "bolsa", 60, True, 90, 8, 4),
-    ("MAT-0310", "Luva de procedimento M", "Material hospitalar", "caixa", 40, True, 160, 6, 6),
-    ("MAT-0420", "Seringa 10ml", "Material hospitalar", "unidade", 300, True, 1500, 40, 7),
-    ("MAT-0530", "Gaze estéril", "Material hospitalar", "pacote", 100, True, 450, 15, 5),
-    ("ANT-0610", "Álcool 70% 1L", "Antisséptico", "frasco", 30, True, 110, 4, 3),
-    ("ANT-0620", "Clorexidina 2%", "Antisséptico", "frasco", 20, True, 50, 3, 2),
-    ("LIM-0710", "Pano de limpeza", "Material de limpeza", "unidade", 50, False, 220, 8, 3),
-    ("LIM-0720", "Desinfetante hospitalar", "Material de limpeza", "frasco", 15, True, 60, 3, 2),
-    ("LIM-0730", "Rodo", "Material de limpeza", "unidade", 5, False, 12, 1, 1),
+    ("1221", "Dipirona 500mg", "Medicamento", "comprimido", 200, True, 900, 30, 10),
+    ("1305", "Paracetamol 750mg", "Medicamento", "comprimido", 150, True, 700, 24, 8),
+    ("2040", "Amoxicilina 500mg", "Medicamento", "cápsula", 100, True, 300, 21, 5),
+    ("3110", "Omeprazol 20mg", "Medicamento", "cápsula", 80, True, 350, 14, 4),
+    ("4502", "Insulina NPH", "Medicamento", "frasco-ampola", 30, True, 70, 3, 3),
+    ("5120", "Dipirona injetável", "Medicamento", "ampola", 60, True, 160, 6, 2),
+    ("6100", "Soro fisiológico 0,9% 500ml", "Soro e solução", "bolsa", 120, True, 400, 12, 7),
+    ("6200", "Soro glicosado 5% 500ml", "Soro e solução", "bolsa", 60, True, 90, 8, 4),
+    ("7310", "Luva de procedimento M", "Material hospitalar", "caixa", 40, True, 160, 6, 6),
+    ("7420", "Seringa 10ml", "Material hospitalar", "unidade", 300, True, 1500, 40, 7),
+    ("7530", "Gaze estéril", "Material hospitalar", "pacote", 100, True, 450, 15, 5),
+    ("8610", "Álcool 70% 1L", "Antisséptico", "frasco", 30, True, 110, 4, 3),
+    ("8620", "Clorexidina 2%", "Antisséptico", "frasco", 20, True, 50, 3, 2),
+    ("9710", "Pano de limpeza", "Material de limpeza", "unidade", 50, False, 220, 8, 3),
+    ("9720", "Desinfetante hospitalar", "Material de limpeza", "frasco", 15, True, 60, 3, 2),
+    ("9730", "Rodo", "Material de limpeza", "unidade", 5, False, 12, 1, 1),
 ]
 
 # (nome, usuário, cargo, perfil)
@@ -50,7 +52,7 @@ SETORES = [
 ]
 
 # Saldo final de alguns itens, para a demonstração ter alertas de estoque baixo e sem estoque
-SALDO_FINAL = {"SOR-0200": 0, "MED-4502": 22, "ANT-0620": 12, "LIM-0730": 3}
+SALDO_FINAL = {"6200": 0, "4502": 22, "8620": 12, "9730": 3}
 
 
 def popular_se_vazio():
@@ -161,17 +163,17 @@ def gerar_movimentacoes(hoje: date) -> list[dict]:
             for codigo in codigos:
                 entrada(dia, "07:30:00", codigo, itens[codigo][6], validade_em(sorteio.randint(150, 500)))
             # Lote que já venceu: aparece em vermelho e só pode sair como descarte
-            entrada(dia, "07:45:00", "MED-5120", 40, validade_em(-2))
+            entrada(dia, "07:45:00", "5120", 40, validade_em(-2))
         if deslocamento == 14:
-            for codigo, quantidade in [("MED-1221", 500), ("MED-1305", 300), ("MAT-0420", 800), ("MAT-0310", 60)]:
+            for codigo, quantidade in [("1221", 500), ("1305", 300), ("7420", 800), ("7310", 60)]:
                 entrada(dia, "08:00:00", codigo, quantidade, validade_em(sorteio.randint(200, 500)))
-            entrada(dia, "08:10:00", "SOR-0100", 200, validade_em(20))
+            entrada(dia, "08:10:00", "6100", 200, validade_em(20))
         if deslocamento == 26:
             # Lote que vence em poucos dias: aparece no alerta de vencimento
-            entrada(dia, "08:00:00", "MED-2040", 90, validade_em(6))
+            entrada(dia, "08:00:00", "2040", 90, validade_em(6))
 
         if deslocamento == 19:
-            saida(dia, "16:00:00", "MAT-0530", 4, "Descarte", "beatriz.rocha")  # pacotes avariados
+            saida(dia, "16:00:00", "7530", 4, "Descarte", "beatriz.rocha")  # pacotes avariados
 
         # Saídas do dia: menos movimento no fim de semana
         quantidade_saidas = sorteio.randint(2, 4) if dia.weekday() >= 5 else sorteio.randint(5, 9)
