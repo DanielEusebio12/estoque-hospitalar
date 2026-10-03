@@ -90,9 +90,15 @@
                         <!-- Preenchido pela aba escolhida (Saída ou Entrada) -->
                         <input type="hidden" name="tipo" id="campo-tipo" value="saida">
 
-                        <label>Medicamento ou material
-                            <select name="material_id" id="select-material" required></select>
+                        <!-- Digita o código (ou usa o leitor de código de barras) ou começa a digitar o nome -->
+                        <label>Código ou nome do item
+                            <input id="busca-item" class="campo-busca" list="sugestoes-itens" autocomplete="off"
+                                   placeholder="Ex.: 1221 ou Dipirona" autofocus>
+                            <span id="item-encontrado" class="dica"></span>
                         </label>
+                        <datalist id="sugestoes-itens"></datalist>
+                        <!-- O que vai para a API é o id; a busca acima só serve para encontrá-lo -->
+                        <input type="hidden" name="material_id" id="material-id">
 
                         <div class="linha-campos">
                             <label>Quantidade <input name="quantidade" type="number" min="1" required placeholder="0"></label>
@@ -168,7 +174,12 @@
                         <button type="button" id="cancelar-edicao-material" class="botao-secundario">Cancelar</button>
                     </div>
                     <form id="form-material">
-                        <label>Nome <input name="nome" required minlength="2" placeholder="Ex.: Dipirona 500mg"></label>
+                        <div class="linha-campos linha-codigo">
+                            <label>Código
+                                <input name="codigo" required maxlength="30" autocapitalize="characters" placeholder="Ex.: 1221">
+                            </label>
+                            <label>Nome <input name="nome" required minlength="2" placeholder="Ex.: Dipirona 500mg"></label>
+                        </div>
 
                         <div class="linha-campos">
                             <label>Categoria
@@ -259,13 +270,14 @@
                 <div id="aba-estoque" hidden>
                     <div class="filtros">
                         <label>Buscar
-                            <input id="busca" class="campo-busca" type="search" placeholder="Nome do item...">
+                            <input id="busca" class="campo-busca" type="search" placeholder="Código ou nome do item...">
                         </label>
                     </div>
                     <div class="tabela-rolagem">
                         <table class="tabela-compacta">
                             <thead>
                                 <tr>
+                                    <th>Código</th>
                                     <th>Nome</th>
                                     <th>Categoria</th>
                                     <th>Unidade</th>

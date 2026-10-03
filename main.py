@@ -54,11 +54,21 @@ CATEGORIAS_COM_VALIDADE_OBRIGATORIA = {"Medicamento", "Soro e solução"}
 
 
 class MaterialEntrada(BaseModel):
+    # Texto e não número: códigos podem ter zero à esquerda ou letras (ex.: 00123, MED-1221)
+    codigo: str = Field(min_length=1, max_length=30)
     nome: str = Field(min_length=2)
     categoria: Categoria
     unidade: str = Field(min_length=1)
     estoque_minimo: int = Field(default=0, ge=0)
     controla_validade: bool = True
+
+    @field_validator("codigo")
+    @classmethod
+    def validar_codigo(cls, valor: str) -> str:
+        valor = valor.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9.\-]+", valor):
+            raise ValueError("Código deve ter só letras, números, ponto ou hífen")
+        return valor
 
     @model_validator(mode="after")
     def validar_validade_obrigatoria(self):
@@ -253,9 +263,11 @@ def criar_material(material: MaterialEntrada, usuario: dict = Depends(exigir_adm
     try:
         with conectar() as conn:
             cursor = conn.execute(
-                "INSERT INTO materiais (nome, categoria, unidade, estoque_minimo, controla_validade) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO materiais "
+                "(codigo, nome, categoria, unidade, estoque_minimo, controla_validade) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
+                    material.codigo,
                     material.nome,
                     material.categoria,
                     material.unidade,
@@ -265,7 +277,7 @@ def criar_material(material: MaterialEntrada, usuario: dict = Depends(exigir_adm
             )
             novo_id = cursor.lastrowid
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Já existe um material com esse nome")
+        raise HTTPException(status_code=409, detail="Já existe um item com esse nome ou código")
     return {"id": novo_id, **material.model_dump()}
 
 
@@ -287,9 +299,10 @@ def editar_material(
                     detail="Não é possível mudar a unidade de um item que já tem movimentações",
                 )
             conn.execute(
-                "UPDATE materiais SET nome = ?, categoria = ?, unidade = ?, estoque_minimo = ?, "
-                "controla_validade = ? WHERE id = ?",
+                "UPDATE materiais SET codigo = ?, nome = ?, categoria = ?, unidade = ?, "
+                "estoque_minimo = ?, controla_validade = ? WHERE id = ?",
                 (
+                    material.codigo,
                     material.nome,
                     material.categoria,
                     material.unidade,
@@ -299,7 +312,7 @@ def editar_material(
                 ),
             )
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Já existe um material com esse nome")
+        raise HTTPException(status_code=409, detail="Já existe um item com esse nome ou código")
     return {"id": material_id, **material.model_dump()}
 
 
@@ -352,8 +365,9 @@ def listar_materiais(
     if not incluir_inativos:
         condicoes.append("m.ativo = 1")
     if busca:
-        condicoes.append("m.nome LIKE ?")
-        parametros.append(f"%{busca}%")
+        # Busca pelo nome ou pelo código exato
+        condicoes.append("(m.nome LIKE ? OR m.codigo = ?)")
+        parametros.extend([f"%{busca}%", busca.strip().upper()])
     if condicoes:
         sql += " WHERE " + " AND ".join(condicoes)
     sql += " GROUP BY m.id ORDER BY m.nome"
@@ -570,7 +584,7 @@ def listar_movimentacoes(
     # LEFT JOIN em colaboradores porque movimentações antigas não têm responsável
     sql = (
         "SELECT mv.id, mv.data, mv.tipo, mv.quantidade, mv.validade, mv.setor, "
-        "m.nome AS material, m.unidade, c.nome AS colaborador "
+        "m.codigo, m.nome AS material, m.unidade, c.nome AS colaborador "
         "FROM movimentacoes mv "
         "JOIN materiais m ON m.id = mv.material_id "
         "LEFT JOIN colaboradores c ON c.id = mv.colaborador_id"

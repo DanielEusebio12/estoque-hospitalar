@@ -51,6 +51,9 @@ def criar_tabelas():
         adicionar_coluna(conn, "movimentacoes", "colaborador_id", "INTEGER REFERENCES colaboradores(id)")
         adicionar_coluna(conn, "materiais", "ativo", "INTEGER NOT NULL DEFAULT 1")
         adicionar_coluna(conn, "materiais", "controla_validade", "INTEGER NOT NULL DEFAULT 1")
+        adicionar_coluna(conn, "materiais", "codigo", "TEXT")
+        # Índice único aceita vários NULL, então itens antigos sem código não conflitam
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_materiais_codigo ON materiais(codigo)")
         adicionar_coluna(conn, "colaboradores", "usuario", "TEXT")
         adicionar_coluna(conn, "colaboradores", "senha_hash", "TEXT")
         adicionar_coluna(conn, "colaboradores", "perfil", "TEXT NOT NULL DEFAULT 'comum'")

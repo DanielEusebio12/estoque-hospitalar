@@ -129,7 +129,7 @@ async function carregarMateriais() {
     tabela.replaceChildren();
     if (materiais.length === 0) {
         const celula = criarElemento("td", busca ? "Nenhum item encontrado." : "Nenhum item cadastrado ainda.", "vazio");
-        celula.colSpan = ehAdmin() ? 7 : 6;
+        celula.colSpan = ehAdmin() ? 8 : 7;
         const linha = document.createElement("tr");
         linha.appendChild(celula);
         tabela.appendChild(linha);
@@ -137,6 +137,7 @@ async function carregarMateriais() {
     }
     for (const material of materiais) {
         const linha = document.createElement("tr");
+        linha.appendChild(criarElemento("td", material.codigo ?? "—", "codigo"));
         linha.appendChild(criarElemento("td", material.nome));
         linha.appendChild(criarElemento("td", material.categoria));
         linha.appendChild(criarElemento("td", material.unidade));
@@ -163,23 +164,64 @@ function mostrarIndicador(id, valor) {
     elemento.classList.toggle("tem-valor", valor > 0);
 }
 
-// Guardada para o painel do item não precisar buscar na API a cada troca do select
+// Guardada para a busca por código e o painel não precisarem chamar a API a cada tecla
 let materiaisAtivos = [];
 
-// Usa a lista completa, sem o filtro da busca, para o select e os indicadores
+// Texto que aparece nas sugestões e no campo depois de escolher: "1221 — Dipirona 500mg"
+function textoDoItem(material) {
+    return material.codigo ? `${material.codigo} — ${material.nome}` : material.nome;
+}
+
+// Aceita o código exato (digitado ou do leitor de código de barras), a sugestão escolhida ou o nome exato
+function encontrarItem(texto) {
+    const procurado = texto.trim().toUpperCase();
+    if (!procurado) {
+        return null;
+    }
+    return (
+        materiaisAtivos.find((item) => item.codigo === procurado) ??
+        materiaisAtivos.find((item) => textoDoItem(item).toUpperCase() === procurado) ??
+        materiaisAtivos.find((item) => item.nome.trim().toUpperCase() === procurado) ??
+        null
+    );
+}
+
+function itemSelecionado() {
+    const id = Number(document.getElementById("material-id").value);
+    return materiaisAtivos.find((item) => item.id === id);
+}
+
+function selecionarItem(material) {
+    document.getElementById("material-id").value = material ? material.id : "";
+    atualizarDicaItem(material);
+    atualizarCamposMovimentacao();
+    atualizarPainelItem().catch((erro) => mostrarMensagem(erro.message, "erro"));
+}
+
+function atualizarDicaItem(material) {
+    const dica = document.getElementById("item-encontrado");
+    const digitado = document.getElementById("busca-item").value.trim();
+    if (material) {
+        dica.textContent = `✓ ${material.nome} · saldo ${material.saldo} ${material.unidade}`;
+        dica.className = "dica ok";
+    } else {
+        dica.textContent = digitado ? "Nenhum item com esse código. Continue digitando o nome ou escolha na lista." : "";
+        dica.className = "dica erro";
+    }
+}
+
+// Usa a lista completa, sem o filtro da busca, para as sugestões e os indicadores
 async function carregarListaCompleta() {
     const materiais = await chamarApi("/materiais");
     materiaisAtivos = materiais;
-    const select = document.getElementById("select-material");
-    const selecionado = select.value;
-    select.replaceChildren();
+    const sugestoes = document.getElementById("sugestoes-itens");
+    sugestoes.replaceChildren();
     for (const material of materiais) {
         const opcao = document.createElement("option");
-        opcao.value = material.id;
-        opcao.textContent = `${material.nome} (saldo: ${material.saldo} ${material.unidade})`;
-        select.appendChild(opcao);
+        opcao.value = textoDoItem(material);
+        opcao.label = `saldo ${material.saldo} ${material.unidade}`;
+        sugestoes.appendChild(opcao);
     }
-    select.value = selecionado || select.value;
 
     const filtro = document.getElementById("filtro-material");
     const filtroSelecionado = filtro.value;
@@ -346,7 +388,7 @@ async function carregarHistorico() {
         );
         linha.appendChild(celulaTipo);
 
-        linha.appendChild(criarElemento("td", mov.material));
+        linha.appendChild(criarElemento("td", mov.codigo ? `${mov.codigo} · ${mov.material}` : mov.material));
         linha.appendChild(criarElemento("td", `${mov.tipo === "entrada" ? "+" : "−"}${mov.quantidade} ${mov.unidade}`, "numero"));
         const destino = mov.tipo === "entrada"
             ? (mov.validade ? "Validade " + formatarValidade(mov.validade) : "—")
@@ -420,8 +462,7 @@ function calcularNivel(material) {
 }
 
 async function atualizarPainelItem() {
-    const id = Number(document.getElementById("select-material").value);
-    const material = materiaisAtivos.find((item) => item.id === id);
+    const material = itemSelecionado();
     document.getElementById("painel-vazio").hidden = Boolean(material);
     document.getElementById("painel-conteudo").hidden = !material;
     if (!material) {
@@ -429,7 +470,8 @@ async function atualizarPainelItem() {
     }
 
     document.getElementById("painel-nome").textContent = material.nome;
-    document.getElementById("painel-categoria").textContent = `${material.categoria} · ${material.unidade}`;
+    document.getElementById("painel-categoria").textContent =
+        `${material.codigo ? "Código " + material.codigo + " · " : ""}${material.categoria} · ${material.unidade}`;
     document.getElementById("painel-saldo").textContent = material.saldo;
     document.getElementById("painel-minimo").textContent = material.estoque_minimo;
     document.getElementById("painel-situacao").replaceChildren(criarEtiqueta(material));
@@ -526,8 +568,8 @@ function iniciarEdicaoMaterial(material) {
     if (![...selectUnidade.options].some((opcao) => opcao.value === material.unidade)) {
         selectUnidade.appendChild(criarElemento("option", material.unidade));
     }
-    for (const campo of ["nome", "categoria", "unidade", "estoque_minimo"]) {
-        form.elements[campo].value = material[campo];
+    for (const campo of ["codigo", "nome", "categoria", "unidade", "estoque_minimo"]) {
+        form.elements[campo].value = material[campo] ?? "";
     }
     form.elements.sem_validade.checked = !material.controla_validade;
     atualizarCheckboxValidade();
@@ -640,6 +682,11 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
     evento.preventDefault();
     const form = evento.target;
     const dados = Object.fromEntries(new FormData(form));
+    if (!dados.material_id) {
+        mostrarMensagem("Escolha o item pelo código ou pelo nome.", "erro");
+        campoBuscaItem.focus();
+        return;
+    }
     dados.material_id = Number(dados.material_id);
     dados.quantidade = Number(dados.quantidade);
     // Envia só os campos do tipo escolhido; campo vazio vira null para o Pydantic validar
@@ -658,6 +705,10 @@ document.getElementById("form-movimentacao").addEventListener("submit", async (e
         mostrarMensagem(`${dados.tipo === "entrada" ? "Entrada" : "Saída"} registrada.`, "sucesso");
         form.querySelector("[name=quantidade]").value = "";
         await atualizarTela();
+        // Volta para a busca com o texto selecionado: o próximo código digitado ou lido substitui o atual
+        campoBuscaItem.focus();
+        campoBuscaItem.select();
+        atualizarDicaItem(itemSelecionado());
     } catch (erro) {
         mostrarMensagem(erro.message, "erro");
     }
@@ -694,8 +745,7 @@ function definirTipo(tipo) {
 // Os campos dependem do tipo e também do item: item sem validade não pede data na entrada
 function atualizarCamposMovimentacao() {
     const ehEntrada = document.getElementById("campo-tipo").value === "entrada";
-    const id = Number(document.getElementById("select-material").value);
-    const material = materiaisAtivos.find((item) => item.id === id);
+    const material = itemSelecionado();
     const semValidade = Boolean(material) && !material.controla_validade;
 
     document.getElementById("campos-saida").hidden = ehEntrada;
@@ -709,9 +759,24 @@ document.getElementById("busca").addEventListener("input", () => {
     carregarMateriais().catch((erro) => mostrarMensagem(erro.message, "erro"));
 });
 
-document.getElementById("select-material").addEventListener("change", () => {
-    atualizarCamposMovimentacao();
-    atualizarPainelItem().catch((erro) => mostrarMensagem(erro.message, "erro"));
+const campoBuscaItem = document.getElementById("busca-item");
+
+campoBuscaItem.addEventListener("input", () => {
+    selecionarItem(encontrarItem(campoBuscaItem.value));
+});
+
+// O leitor de código de barras "digita" o código e aperta Enter; sem isso o formulário seria enviado
+campoBuscaItem.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Enter") {
+        return;
+    }
+    evento.preventDefault();
+    const material = encontrarItem(campoBuscaItem.value);
+    selecionarItem(material);
+    if (material) {
+        campoBuscaItem.value = textoDoItem(material);
+        document.querySelector("#form-movimentacao [name=quantidade]").focus();
+    }
 });
 
 for (const id of ["filtro-material", "filtro-tipo"]) {
