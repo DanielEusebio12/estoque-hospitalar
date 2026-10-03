@@ -7,7 +7,7 @@
 #     return {"mensagem": "Estoque funcionando"}
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -567,6 +567,68 @@ def resetar_senha(colaborador_id: int, gestor: dict = Depends(exigir_admin)):
         )
         conn.execute("DELETE FROM sessoes WHERE colaborador_id = ?", (colaborador_id,))
     return {"mensagem": "Senha redefinida para a padrão"}
+
+
+# ---------- Painel (gráficos) ----------
+
+# Quantos itens aparecem no gráfico de mais retirados
+LIMITE_ITENS_PAINEL = 8
+
+
+@app.get("/painel")
+def painel(
+    dias: int = Query(default=30, ge=1, le=365), gestor: dict = Depends(exigir_admin)
+):
+    inicio = date.today() - timedelta(days=dias - 1)
+    # date(data) corta a hora; comparar texto ISO funciona porque a ordem alfabética é a cronológica
+    filtro_periodo = "date(mv.data) >= ?"
+
+    with conectar() as conn:
+        # Conta registros, e não quantidades: somar comprimidos com caixas não teria sentido
+        por_dia = conn.execute(
+            "SELECT date(mv.data) AS dia, "
+            "SUM(mv.tipo = 'entrada') AS entradas, SUM(mv.tipo = 'saida') AS saidas "
+            f"FROM movimentacoes mv WHERE {filtro_periodo} GROUP BY dia",
+            (inicio.isoformat(),),
+        ).fetchall()
+        por_setor = conn.execute(
+            "SELECT mv.setor, COUNT(*) AS saidas FROM movimentacoes mv "
+            f"WHERE mv.tipo = 'saida' AND {filtro_periodo} "
+            "GROUP BY mv.setor ORDER BY saidas DESC, mv.setor",
+            (inicio.isoformat(),),
+        ).fetchall()
+        # Aqui somar quantidade faz sentido: cada linha é um item só, com uma unidade só
+        mais_retirados = conn.execute(
+            "SELECT m.codigo, m.nome, m.unidade, SUM(mv.quantidade) AS quantidade "
+            "FROM movimentacoes mv JOIN materiais m ON m.id = mv.material_id "
+            f"WHERE mv.tipo = 'saida' AND mv.setor != ? AND {filtro_periodo} "
+            "GROUP BY m.id ORDER BY quantidade DESC, m.nome LIMIT ?",
+            (SETOR_DESCARTE, inicio.isoformat(), LIMITE_ITENS_PAINEL),
+        ).fetchall()
+
+    # Preenche os dias sem movimentação com zero, para o gráfico não "pular" datas
+    contagens = {linha["dia"]: linha for linha in por_dia}
+    dias_periodo = []
+    for deslocamento in range(dias):
+        dia = (inicio + timedelta(days=deslocamento)).isoformat()
+        linha = contagens.get(dia)
+        dias_periodo.append(
+            {
+                "dia": dia,
+                "entradas": linha["entradas"] if linha else 0,
+                "saidas": linha["saidas"] if linha else 0,
+            }
+        )
+
+    return {
+        "dias": dias,
+        "inicio": inicio.isoformat(),
+        "total_entradas": sum(dia["entradas"] for dia in dias_periodo),
+        "total_saidas": sum(dia["saidas"] for dia in dias_periodo),
+        "por_dia": dias_periodo,
+        "por_setor": [dict(linha) for linha in por_setor],
+        "mais_retirados": [dict(linha) for linha in mais_retirados],
+    }
 
 
 # ---------- Movimentações ----------

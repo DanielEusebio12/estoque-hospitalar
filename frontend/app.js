@@ -754,7 +754,126 @@ function abrirAba(botao) {
     document.querySelectorAll(".alertas").forEach((cartao) => {
         cartao.hidden = botao.hasAttribute("data-sem-alertas");
     });
+    // O painel só busca dados quando é aberto, para não pesar nas outras abas
+    if (botao.dataset.aba === "aba-painel") {
+        carregarPainel().catch((erro) => mostrarMensagem(erro.message, "erro"));
+    }
 }
+
+// ---------- Painel (gráficos) ----------
+
+let diasPainel = 30;
+// Guardado para redesenhar o gráfico de linhas quando a largura da tela muda
+let ultimoPainel = null;
+
+const SERIES_POR_DIA = [
+    { chave: "entradas", nome: "entradas", classe: "entrada" },
+    { chave: "saidas", nome: "saídas", classe: "saida" },
+];
+
+// "2026-10-02" vira "02/10" no eixo e "02/10/2026" no balão
+const diaCurto = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+
+function plural(quantidade, singular, pluralTexto) {
+    return `${formatarNumero(quantidade)} ${quantidade === 1 ? singular : pluralTexto}`;
+}
+
+function desenharLinhasPainel() {
+    if (ultimoPainel) {
+        desenharGraficoLinhas(
+            document.getElementById("grafico-dias"),
+            ultimoPainel.por_dia,
+            SERIES_POR_DIA,
+            diaCurto,
+            formatarValidade,
+        );
+    }
+}
+
+async function carregarPainel() {
+    const aba = document.getElementById("aba-painel");
+    aba.classList.add("carregando");
+    try {
+        ultimoPainel = await chamarApi(`/painel?dias=${diasPainel}`);
+    } finally {
+        aba.classList.remove("carregando");
+    }
+    const painel = ultimoPainel;
+
+    document.getElementById("painel-total-entradas").textContent = formatarNumero(painel.total_entradas);
+    document.getElementById("painel-total-saidas").textContent = formatarNumero(painel.total_saidas);
+    const lider = painel.por_setor[0];
+    document.getElementById("painel-setor-lider").textContent = lider ? lider.setor : "—";
+    document.getElementById("painel-setor-lider-detalhe").textContent = lider
+        ? plural(lider.saidas, "saída", "saídas")
+        : "Nenhuma saída no período";
+
+    desenharLinhasPainel();
+    desenharTabela(
+        document.getElementById("tabela-dias"),
+        ["Dia", "Entradas", "Saídas"],
+        painel.por_dia.map((dia) => [formatarValidade(dia.dia), dia.entradas, dia.saidas]),
+        [1, 2],
+    );
+
+    desenharGraficoBarras(
+        document.getElementById("grafico-setores"),
+        painel.por_setor.map((setor) => ({
+            rotulo: setor.setor,
+            valor: setor.saidas,
+            textoValor: formatarNumero(setor.saidas),
+            descricao: setor.saidas === 1 ? "saída" : "saídas",
+        })),
+        "saida",
+        "Nenhuma saída no período.",
+    );
+    desenharTabela(
+        document.getElementById("tabela-setores"),
+        ["Setor", "Saídas"],
+        painel.por_setor.map((setor) => [setor.setor, setor.saidas]),
+        [1],
+    );
+
+    desenharGraficoBarras(
+        document.getElementById("grafico-itens"),
+        painel.mais_retirados.map((item) => ({
+            rotulo: item.codigo ? `${item.codigo} · ${item.nome}` : item.nome,
+            valor: item.quantidade,
+            textoValor: `${formatarNumero(item.quantidade)} ${item.unidade}`,
+            descricao: "retirados",
+        })),
+        "saida",
+        "Nenhum item retirado no período.",
+    );
+    desenharTabela(
+        document.getElementById("tabela-itens"),
+        ["Item", "Quantidade", "Unidade"],
+        painel.mais_retirados.map((item) => [
+            item.codigo ? `${item.codigo} · ${item.nome}` : item.nome,
+            item.quantidade,
+            item.unidade,
+        ]),
+        [1],
+    );
+}
+
+document.querySelectorAll(".periodo").forEach((botao) => {
+    botao.addEventListener("click", () => {
+        document.querySelectorAll(".periodo").forEach((outro) => outro.classList.toggle("ativa", outro === botao));
+        diasPainel = Number(botao.dataset.dias);
+        carregarPainel().catch((erro) => mostrarMensagem(erro.message, "erro"));
+    });
+});
+
+// Redesenha só quando a largura muda de verdade (ex.: janela redimensionada)
+let larguraGrafico = 0;
+new ResizeObserver((entradas) => {
+    const largura = Math.round(entradas[0].contentRect.width);
+    if (largura && largura !== larguraGrafico) {
+        larguraGrafico = largura;
+        desenharLinhasPainel();
+    }
+}).observe(document.getElementById("grafico-dias"));
 
 document.querySelectorAll(".aba").forEach((botao) => {
     botao.addEventListener("click", () => abrirAba(botao));

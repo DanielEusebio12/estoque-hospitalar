@@ -1,5 +1,8 @@
 /* Cores e medidas centralizadas para mudar o visual em um lugar só */
 :root {
+    /* Cores das séries dos gráficos, validadas para daltonismo (contraste e separação) */
+    --serie-entrada: #0d9488;
+    --serie-saida: #eb6834;
     --fundo: #f4f6f9;
     --superficie: #ffffff;
     --superficie-suave: #f8fafc;
@@ -215,7 +218,8 @@ main {
     border-radius: 10px;
 }
 
-.aba {
+.aba,
+.periodo {
     background: transparent;
     color: var(--texto-suave);
     border: none;
@@ -228,11 +232,13 @@ main {
     transition: background 0.15s, color 0.15s;
 }
 
-.aba:hover {
+.aba:hover,
+.periodo:hover {
     color: var(--texto);
 }
 
-.aba.ativa {
+.aba.ativa,
+.periodo.ativa {
     background: var(--superficie);
     color: var(--texto);
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
@@ -974,6 +980,294 @@ td.vazio {
     font-size: 0.85rem;
     cursor: pointer;
     text-decoration: underline;
+}
+
+/* ---------- Painel (gráficos) ---------- */
+
+/* Enquanto busca dados novos, mantém o gráfico anterior apagado, sem piscar nem pular */
+.aba-painel.carregando .grafico-cartao,
+.aba-painel.carregando .numeros-periodo {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.barra-periodo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.seletor-periodo {
+    margin-bottom: 0;
+}
+
+.numeros-periodo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.numero-periodo {
+    padding: 14px 16px;
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    background: var(--superficie-suave);
+}
+
+.numero-periodo strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.numero-periodo .texto-suave {
+    font-size: 0.8rem;
+}
+
+.grafico-cartao {
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    padding: 18px 18px 12px;
+    margin-bottom: 16px;
+}
+
+.grafico-cartao h3 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.grafico-cartao > .texto-suave,
+.grafico-cabecalho .texto-suave {
+    margin: 2px 0 12px;
+    font-size: 0.8rem;
+}
+
+.grafico-cabecalho {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.graficos-lado-a-lado {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.graficos-lado-a-lado .grafico-cartao {
+    margin-bottom: 0;
+}
+
+/* Legenda com traço da cor da série; o texto fica na cor normal, nunca na cor da série */
+.legenda {
+    display: flex;
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+    color: var(--texto-suave);
+}
+
+.legenda li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chave-linha {
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.chave-linha.entrada {
+    background: var(--serie-entrada);
+}
+
+.chave-linha.saida {
+    background: var(--serie-saida);
+}
+
+.grafico-svg {
+    display: block;
+    overflow: visible;
+}
+
+.grafico-svg .grade {
+    stroke: #edf0f4;
+    stroke-width: 1;
+}
+
+.grafico-svg .eixo {
+    stroke: #cbd5e1;
+    stroke-width: 1;
+}
+
+.grafico-svg .rotulo-eixo {
+    fill: var(--texto-suave);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.grafico-svg .linha-serie {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.linha-serie.entrada {
+    stroke: var(--serie-entrada);
+}
+
+.linha-serie.saida {
+    stroke: var(--serie-saida);
+}
+
+/* Anel branco em volta do ponto para ele aparecer mesmo em cima de outra linha */
+.grafico-svg .ponto-serie {
+    stroke: var(--superficie);
+    stroke-width: 2;
+}
+
+.ponto-serie.entrada {
+    fill: var(--serie-entrada);
+}
+
+.ponto-serie.saida {
+    fill: var(--serie-saida);
+}
+
+.grafico-svg .mira {
+    stroke: #94a3b8;
+    stroke-width: 1;
+}
+
+.grafico-svg .area-interativa {
+    fill: transparent;
+    cursor: crosshair;
+    outline: none;
+}
+
+/* Barras horizontais: nome à esquerda, barra e valor na ponta à direita */
+.linha-barra {
+    display: grid;
+    grid-template-columns: minmax(90px, 2fr) 3fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 4px;
+    border-radius: var(--raio-pequeno);
+    outline: none;
+}
+
+.linha-barra:hover,
+.linha-barra:focus-visible {
+    background: var(--superficie-suave);
+}
+
+.rotulo-barra {
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+}
+
+.trilho-barra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* 16px de espessura e ponta arredondada só do lado do valor; 64px ficam reservados para o número */
+.barra-grafico {
+    flex-shrink: 0;
+    height: 16px;
+    min-width: 3px;
+    width: calc((100% - 64px) * var(--fracao));
+    border-radius: 0 4px 4px 0;
+}
+
+.barra-grafico.entrada {
+    background: var(--serie-entrada);
+}
+
+.barra-grafico.saida {
+    background: var(--serie-saida);
+}
+
+.linha-barra:hover .barra-grafico,
+.linha-barra:focus-visible .barra-grafico {
+    filter: brightness(1.1);
+}
+
+.valor-barra {
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.grafico-vazio {
+    padding: 24px 0;
+    text-align: center;
+}
+
+.ver-tabela {
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.ver-tabela summary {
+    cursor: pointer;
+    color: var(--texto-suave);
+    width: fit-content;
+}
+
+.ver-tabela summary:hover {
+    color: var(--texto);
+}
+
+.ver-tabela table {
+    margin-top: 8px;
+}
+
+.tooltip-grafico {
+    position: fixed;
+    z-index: 20;
+    pointer-events: none;
+    min-width: 140px;
+    padding: 8px 10px;
+    border-radius: var(--raio-pequeno);
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+    font-size: 0.8rem;
+}
+
+.tooltip-titulo {
+    margin-bottom: 4px;
+    color: var(--texto-suave);
+}
+
+.tooltip-linha {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tooltip-linha strong {
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.tooltip-linha span:last-child {
+    color: var(--texto-suave);
 }
 
 /* ---------- Mensagem flutuante ---------- */
